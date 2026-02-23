@@ -183,6 +183,9 @@ class EmotionalDetector(BaseAnalyzer):
                 if self.mode == "remove" and emotional_words:
                     # Remove emotional words but keep factual content
                     # Filter out markers like [CAPS], [PUNCTUATION]
+                    # FIXME: Words with trailing punctuation (e.g. "shocking!")
+                    # fail to match \b regex anchors in remove_words — strip
+                    # punctuation from tokens before passing to remove_words
                     words_to_remove = [w for w in emotional_words if not w.startswith("[")]
                     cleaned_text = remove_words(sentence.text, words_to_remove)
                     self.words_removed += len(words_to_remove)

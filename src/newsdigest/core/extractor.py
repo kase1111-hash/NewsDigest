@@ -341,10 +341,12 @@ class Extractor:
         Returns:
             True if URL.
         """
+        # TODO: urlparse is permissive — consider stricter URL validation
+        # (e.g. the validation module's validate_url) for untrusted input
         try:
             result = urlparse(source)
             return all([result.scheme in ("http", "https"), result.netloc])
-        except Exception:
+        except (ValueError, AttributeError):
             return False
 
     def _looks_like_rss(self, url: str) -> bool:
@@ -566,7 +568,8 @@ class Extractor:
 
         claim_count = len(claims)
         if claim_count == 0:
-            # Estimate based on entity-like patterns
+            # FIXME: Entity-based density estimation is a rough heuristic;
+            # consider using sentence-transformers for semantic density scoring
             entity_pattern = r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b'
             entities = re.findall(entity_pattern, text)
             claim_count = len(set(entities)) // 3  # Rough estimate

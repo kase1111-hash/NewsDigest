@@ -1,5 +1,6 @@
 """Caching implementations for NewsDigest."""
 
+import asyncio
 import fnmatch
 import hashlib
 import json
@@ -33,6 +34,9 @@ class MemoryCache(BaseStorage[T]):
 
     Fast, ephemeral cache that lives for the duration of the process.
     Useful for caching extraction results during a session.
+
+    TODO: Consider replacing with cachetools.TTLCache for production use —
+    it handles eviction policies and thread safety more robustly.
     """
 
     def __init__(self, max_size: int = 1000, default_ttl: int | None = 3600) -> None:
@@ -45,64 +49,71 @@ class MemoryCache(BaseStorage[T]):
         self._cache: dict[str, CacheEntry[T]] = {}
         self._max_size = max_size
         self._default_ttl = default_ttl
+        self._lock = asyncio.Lock()
 
     async def get(self, key: str) -> T | None:
         """Retrieve an item from cache."""
-        entry = self._cache.get(key)
-        if entry is None:
-            return None
+        async with self._lock:
+            entry = self._cache.get(key)
+            if entry is None:
+                return None
 
-        if entry.is_expired():
-            del self._cache[key]
-            return None
+            if entry.is_expired():
+                del self._cache[key]
+                return None
 
-        return entry.value
+            return entry.value
 
     async def set(self, key: str, value: T, ttl: int | None = None) -> None:
         """Store an item in cache."""
-        # Evict oldest entries if at capacity
-        if len(self._cache) >= self._max_size:
-            self._evict_oldest()
+        async with self._lock:
+            # Evict oldest entries if at capacity
+            if len(self._cache) >= self._max_size:
+                self._evict_oldest()
 
-        actual_ttl = ttl if ttl is not None else self._default_ttl
-        expires_at = time.time() + actual_ttl if actual_ttl else None
+            actual_ttl = ttl if ttl is not None else self._default_ttl
+            expires_at = time.time() + actual_ttl if actual_ttl else None
 
-        self._cache[key] = CacheEntry(
-            value=value,
-            created_at=time.time(),
-            expires_at=expires_at,
-        )
+            self._cache[key] = CacheEntry(
+                value=value,
+                created_at=time.time(),
+                expires_at=expires_at,
+            )
 
     async def delete(self, key: str) -> bool:
         """Delete an item from cache."""
-        if key in self._cache:
-            del self._cache[key]
-            return True
-        return False
+        async with self._lock:
+            if key in self._cache:
+                del self._cache[key]
+                return True
+            return False
 
     async def exists(self, key: str) -> bool:
         """Check if an item exists in cache."""
-        entry = self._cache.get(key)
-        if entry is None:
-            return False
-        if entry.is_expired():
-            del self._cache[key]
-            return False
-        return True
+        async with self._lock:
+            entry = self._cache.get(key)
+            if entry is None:
+                return False
+            if entry.is_expired():
+                del self._cache[key]
+                return False
+            return True
 
     async def clear(self) -> None:
         """Clear all cached items."""
-        self._cache.clear()
+        async with self._lock:
+            self._cache.clear()
 
     async def keys(self, pattern: str | None = None) -> list[str]:
         """Get all cache keys, optionally filtered by pattern."""
-        # Clean expired entries first
-        self._clean_expired()
+        async with self._lock:
+            # Clean expired entries first
+            self._clean_expired()
 
-        if pattern is None:
-            return list(self._cache.keys())
+            if pattern is None:
+                return list(self._cache.keys())
 
-        return [k for k in self._cache.keys() if fnmatch.fnmatch(k, pattern)]
+            return [k for k in self._cache.keys() if fnmatch.fnmatch(k, pattern)]
 
     def _evict_oldest(self) -> None:
         """Evict the oldest cache entry."""
@@ -204,8 +215,8 @@ class FileCache(SyncStorage[dict[str, Any]]):
 
     def keys(self, pattern: str | None = None) -> list[str]:
         """Get all cache keys."""
-        # Note: We can't recover original keys from hashed filenames
-        # So this returns file stems
+        # FIXME: Cannot recover original keys from hashed filenames;
+        # consider storing a key->hash mapping separately
         keys = [f.stem for f in self._cache_dir.glob("*.json")]
         if pattern:
             keys = [k for k in keys if fnmatch.fnmatch(k, pattern)]

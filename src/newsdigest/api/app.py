@@ -29,10 +29,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan handler."""
     # Startup
     app.state.config = Config()
-    app.state.cache = MemoryCache(max_size=1000, default_ttl=300)
+    config = app.state.config
+    if config.cache_enabled:
+        app.state.cache = MemoryCache(
+            max_size=config.cache_max_size,
+            default_ttl=config.cache_ttl,
+        )
+    else:
+        app.state.cache = None
     yield
     # Shutdown
-    await app.state.cache.clear()
+    if app.state.cache:
+        await app.state.cache.clear()
 
 
 def create_app(
