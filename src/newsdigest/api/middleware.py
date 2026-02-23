@@ -255,6 +255,9 @@ class RateLimiter:
     Implements a token bucket algorithm for rate limiting.
     Each API key gets its own bucket.
 
+    TODO: This assumes single-process deployment. For multi-worker
+    setups (gunicorn, etc.), use a Redis-backed limiter instead.
+
     Example:
         >>> limiter = RateLimiter(requests_per_minute=100)
         >>> if limiter.is_allowed("user-123"):
