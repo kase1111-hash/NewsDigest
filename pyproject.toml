@@ -40,7 +40,7 @@ classifiers = [
 dependencies = [
     # CLI
     "click>=8.1.0",
-    "rich>=13.0.0",
+    "rich>=15.0.0",
 
     # HTTP
     "httpx>=0.25.0",
