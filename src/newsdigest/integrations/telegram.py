@@ -12,6 +12,11 @@ from typing import Any
 
 import httpx
 
+from newsdigest.utils.logging import get_logger
+
+
+logger = get_logger(__name__)
+
 
 @dataclass
 class TelegramUser:
@@ -244,9 +249,9 @@ class TelegramBot:
                 for update in updates:
                     await self._handle_update(update)
 
-            except Exception:
-                # Log error, continue running
-                pass
+            except Exception as e:
+                # Keep polling; a failed poll must not stop the bot
+                logger.warning(f"Telegram polling failed: {e}")
 
             await asyncio.sleep(poll_interval)
 
@@ -301,7 +306,7 @@ class TelegramBot:
         if not result.get("ok"):
             return []
 
-        updates = result.get("result", [])
+        updates: list[dict[str, Any]] = result.get("result", [])
 
         # Update offset
         if updates:

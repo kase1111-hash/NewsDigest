@@ -85,6 +85,9 @@ class TestURLValidationSecurity:
             "http://0x7f.0.0.1/",
             "http://127.1/",
             "http://[::ffff:127.0.0.1]/",
+            "http://[::7f00:1]/",
+            "http://[64:ff9b::7f00:1]/",
+            "http://[2002:7f00:1::]/",
             # Other non-public ranges and names
             "http://0.0.0.0/",
             "http://100.64.0.1/",

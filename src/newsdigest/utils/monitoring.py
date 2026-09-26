@@ -14,6 +14,11 @@ from typing import Any
 
 import httpx
 
+from newsdigest.utils.logging import get_logger
+
+
+logger = get_logger(__name__)
+
 
 class HealthStatus(Enum):
     """Service health status."""
@@ -496,8 +501,9 @@ class ServiceMonitor:
                                 )
                             )
 
-            except Exception:
-                pass  # Don't crash on monitor errors
+            except Exception as e:
+                # Don't crash on monitor errors
+                logger.warning(f"Health monitor check failed: {e}")
 
             await asyncio.sleep(self._check_interval)
 

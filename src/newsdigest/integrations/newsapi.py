@@ -11,6 +11,8 @@ from typing import Any
 
 import httpx
 
+from newsdigest.utils.logging import get_logger
+
 
 try:
     from newsapi import NewsApiClient
@@ -18,7 +20,10 @@ try:
     HAS_NEWSAPI = True
 except ImportError:
     HAS_NEWSAPI = False
-    NewsApiClient = None  # type: ignore
+    NewsApiClient = None
+
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -211,7 +216,8 @@ class NewsAPIClient:
         response.raise_for_status()
 
         data = response.json()
-        return data.get("sources", [])
+        sources: list[dict[str, Any]] = data.get("sources", [])
+        return sources
 
     async def get_recent(
         self,
@@ -364,7 +370,7 @@ class NewsAPIIngestor:
         Returns:
             List of article dictionaries ready for extraction.
         """
-        all_articles = []
+        all_articles: list[dict[str, Any]] = []
         from_date = datetime.now(UTC) - timedelta(hours=hours)
 
         for query_config in self._queries:
@@ -392,8 +398,9 @@ class NewsAPIIngestor:
                     for article in articles
                 )
 
-            except Exception:
-                # Skip failed queries, log would be added here
+            except Exception as e:
+                # Skip failed queries
+                logger.warning(f"NewsAPI query {query_config['name']!r} failed: {e}")
                 continue
 
         return all_articles

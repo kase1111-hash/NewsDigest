@@ -6,6 +6,7 @@ and reduces code duplication (DRY principle).
 """
 
 import re  # noqa: I001
+from collections.abc import Set as AbstractSet
 
 # Punctuation characters to strip from words (deduplicated set)
 # Includes standard ASCII and common Unicode punctuation
@@ -217,7 +218,9 @@ def fix_punctuation_spacing(text: str) -> str:
     return text
 
 
-def get_content_words(text: str, stop_words: set[str] | None = None) -> list[str]:
+def get_content_words(
+    text: str, stop_words: AbstractSet[str] | None = None
+) -> list[str]:
     """Extract content words (non-stop words) from text.
 
     Args:

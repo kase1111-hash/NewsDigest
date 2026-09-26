@@ -254,7 +254,8 @@ class SlackBot:
         )
 
         result = response.json()
-        return result.get("ok", False)
+        ok: bool = result.get("ok", False)
+        return ok
 
     async def add_reaction(
         self,
@@ -282,7 +283,8 @@ class SlackBot:
         )
 
         result = response.json()
-        return result.get("ok", False)
+        ok: bool = result.get("ok", False)
+        return ok
 
     async def get_channel_history(
         self,
@@ -585,4 +587,4 @@ def create_newsdigest_slack_bot(
         default_channel=default_channel,
     )
 
-    return SlackBot(config=config)
+    return SlackBot(bot_token, config=config)

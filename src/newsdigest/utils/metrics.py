@@ -6,7 +6,7 @@ usage statistics, and optional external reporting.
 
 import time
 from collections import defaultdict
-from collections.abc import Callable
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -144,7 +144,7 @@ class MetricsCollector:
         self._enabled = False
 
     @contextmanager
-    def timer(self, name: str):
+    def timer(self, name: str) -> Generator[None, None, None]:
         """Context manager for timing operations.
 
         Args:
@@ -403,7 +403,7 @@ def record_histogram(name: str, value: float) -> None:
 
 
 @contextmanager
-def timer(name: str):
+def timer(name: str) -> Generator[None, None, None]:
     """Context manager for timing operations using global collector."""
     with get_metrics().timer(name):
         yield

@@ -148,9 +148,27 @@ def is_private_host(hostname: str) -> bool:
     ip = _parse_ip(host)
     if ip is None:
         return False
-    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
-        ip = ip.ipv4_mapped
+    if isinstance(ip, ipaddress.IPv6Address):
+        ip = _embedded_ipv4(ip) or ip
     return not ip.is_global or ip.is_multicast
+
+
+# IPv6 ranges that carry an IPv4 address in their low 32 bits
+_IPV4_EMBEDDING_NETWORKS = (
+    ipaddress.IPv6Network("::/96"),  # IPv4-compatible (deprecated)
+    ipaddress.IPv6Network("64:ff9b::/96"),  # NAT64 well-known prefix
+)
+
+
+def _embedded_ipv4(ip: ipaddress.IPv6Address) -> ipaddress.IPv4Address | None:
+    """Return the IPv4 address an IPv6 address stands for, if any."""
+    if ip.ipv4_mapped:
+        return ip.ipv4_mapped
+    if ip.sixtofour:
+        return ip.sixtofour
+    if any(ip in network for network in _IPV4_EMBEDDING_NETWORKS):
+        return ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF)
+    return None
 
 
 def validate_url(url: str, allow_private: bool = False) -> tuple[bool, str | None]:
@@ -461,7 +479,8 @@ def validate_extraction_mode(mode: str) -> str:
         ValidationError: If mode is invalid.
     """
     allowed = ["conservative", "standard", "aggressive"]
-    return validate_enum(mode, allowed, "extraction mode")
+    validated: str = validate_enum(mode, allowed, "extraction mode")
+    return validated
 
 
 def validate_handling_mode(mode: str, name: str = "handling mode") -> str:
@@ -478,7 +497,8 @@ def validate_handling_mode(mode: str, name: str = "handling mode") -> str:
         ValidationError: If mode is invalid.
     """
     allowed = ["keep", "flag", "remove"]
-    return validate_enum(mode, allowed, name)
+    validated: str = validate_enum(mode, allowed, name)
+    return validated
 
 
 # =============================================================================

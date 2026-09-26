@@ -50,7 +50,7 @@ class RetryConfig:
         base_delay: float = 1.0,
         max_delay: float = 30.0,
         exponential_base: float = 2.0,
-        retry_status_codes: set | None = None,
+        retry_status_codes: set[int] | None = None,
     ) -> None:
         """Initialize retry configuration.
 

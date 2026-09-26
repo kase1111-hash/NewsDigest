@@ -11,7 +11,7 @@ import importlib.util
 import os
 import sys
 import traceback
-from collections.abc import Callable
+from collections.abc import Callable, Generator
 from contextlib import contextmanager, suppress
 from datetime import datetime
 from enum import Enum
@@ -74,7 +74,7 @@ class ErrorContext:
             level: Severity level.
             data: Additional data.
         """
-        breadcrumb = {
+        breadcrumb: dict[str, Any] = {
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "message": message,
             "category": category,
@@ -192,7 +192,7 @@ class ErrorReporter:
         self._environment: str = "development"
         self._release: str | None = None
         self._sample_rate: float = 1.0
-        self._error_handlers: list[Callable[[Exception, dict[str, Any]], None]] = []
+        self._error_handlers: list[Callable[[BaseException, dict[str, Any]], None]] = []
 
         # Check for sentry-sdk
         self._sentry_available = importlib.util.find_spec("sentry_sdk") is not None
@@ -270,7 +270,7 @@ class ErrorReporter:
 
     def add_error_handler(
         self,
-        handler: Callable[[Exception, dict[str, Any]], None],
+        handler: Callable[[BaseException, dict[str, Any]], None],
     ) -> None:
         """Add a custom error handler.
 
@@ -281,7 +281,7 @@ class ErrorReporter:
 
     def capture_exception(
         self,
-        exception: Exception | None = None,
+        exception: BaseException | None = None,
         severity: ErrorSeverity = ErrorSeverity.ERROR,
         extra: dict[str, Any] | None = None,
         tags: dict[str, str] | None = None,
@@ -349,7 +349,7 @@ class ErrorReporter:
                         )
 
                     scope.level = severity.value
-                    event_id = sentry_sdk.capture_exception(exception)
+                    event_id: str | None = sentry_sdk.capture_exception(exception)
                     return event_id
 
             except Exception as sentry_error:
@@ -393,7 +393,7 @@ class ErrorReporter:
                             scope.set_extra(key, value)
 
                     scope.level = severity.value
-                    event_id = sentry_sdk.capture_message(message)
+                    event_id: str | None = sentry_sdk.capture_message(message)
                     return event_id
 
             except Exception as sentry_error:
@@ -429,8 +429,9 @@ class ErrorReporter:
                     level=level,
                     data=data,
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                # Error reporting must never raise into the caller
+                logger.debug(f"Sentry call failed: {e}")
 
     def set_tag(self, key: str, value: str) -> None:
         """Set a global tag.
@@ -446,8 +447,9 @@ class ErrorReporter:
                 import sentry_sdk
 
                 sentry_sdk.set_tag(key, value)
-            except Exception:
-                pass
+            except Exception as e:
+                # Error reporting must never raise into the caller
+                logger.debug(f"Sentry call failed: {e}")
 
     def set_user(
         self,
@@ -476,8 +478,9 @@ class ErrorReporter:
                 if username:
                     user_data["username"] = username
                 sentry_sdk.set_user(user_data)
-            except Exception:
-                pass
+            except Exception as e:
+                # Error reporting must never raise into the caller
+                logger.debug(f"Sentry call failed: {e}")
 
     @property
     def is_configured(self) -> bool:
@@ -529,7 +532,7 @@ def configure_error_reporting(
 
 
 def capture_exception(
-    exception: Exception | None = None,
+    exception: BaseException | None = None,
     **kwargs: Any,
 ) -> str | None:
     """Capture an exception using global reporter.
@@ -651,7 +654,7 @@ def error_boundary(
     severity: ErrorSeverity = ErrorSeverity.ERROR,
     reraise: bool = True,
     extra: dict[str, Any] | None = None,
-):
+) -> Generator[None, None, None]:
     """Context manager for capturing errors within a scope.
 
     Args:
@@ -730,7 +733,7 @@ def format_exception(
     return "\n".join(parts)
 
 
-def get_exception_chain(exception: Exception) -> list[Exception]:
+def get_exception_chain(exception: BaseException) -> list[BaseException]:
     """Get the chain of exceptions (cause chain).
 
     Args:

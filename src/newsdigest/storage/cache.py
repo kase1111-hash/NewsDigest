@@ -172,7 +172,8 @@ class FileCache(SyncStorage[dict[str, Any]]):
                 file_path.unlink()
                 return None
 
-            return entry.get("value")
+            value: dict[str, Any] | None = entry.get("value")
+            return value
         except (json.JSONDecodeError, OSError):
             return None
 

@@ -12,7 +12,7 @@ import logging
 import os
 import sys
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from datetime import datetime
 from functools import wraps
@@ -90,7 +90,7 @@ class StructuredFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         """Format log record as structured data."""
-        log_data = {
+        log_data: dict[str, Any] = {
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "level": record.levelname,
             "logger": record.name,
@@ -213,7 +213,7 @@ def get_logger(name: str | None = None) -> logging.Logger:
 
 
 @contextmanager
-def log_context(**kwargs: Any):
+def log_context(**kwargs: Any) -> Generator[None, None, None]:
     """Context manager to add extra fields to log records.
 
     Usage:

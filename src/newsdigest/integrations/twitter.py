@@ -11,6 +11,8 @@ from typing import Any
 
 import httpx
 
+from newsdigest.utils.logging import get_logger
+
 
 try:
     import tweepy
@@ -18,7 +20,10 @@ try:
     HAS_TWEEPY = True
 except ImportError:
     HAS_TWEEPY = False
-    tweepy = None  # type: ignore
+    tweepy = None
+
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -74,7 +79,7 @@ class TwitterClient:
     def __init__(
         self,
         config: TwitterConfig | None = None,
-        bearer_token: str = "",
+        bearer_token: str = "",  # nosec B107 - empty default, not a credential
     ) -> None:
         """Initialize Twitter client.
 
@@ -413,7 +418,7 @@ class TwitterIngestor:
         Returns:
             List of tweet dictionaries ready for extraction.
         """
-        all_tweets = []
+        all_tweets: list[dict[str, Any]] = []
 
         for source in self._sources:
             try:
@@ -444,8 +449,9 @@ class TwitterIngestor:
                     for tweet in tweets
                 )
 
-            except Exception:
+            except Exception as e:
                 # Skip failed sources
+                logger.warning(f"Twitter source failed: {e}")
                 continue
 
         return all_tweets
