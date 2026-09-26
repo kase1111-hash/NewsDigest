@@ -32,16 +32,12 @@ async def compare_content(
         Comparison showing what was kept and removed.
     """
     config = get_config(request)
-    extractor = Extractor(config)
+    extractor = Extractor(config, mode=body.mode.value)
 
     start_time = time.perf_counter()
 
-    # Extract content
-    source = body.source.strip()
-    if source.startswith(("http://", "https://")):
-        result = await extractor.extract(source)
-    else:
-        result = extractor.extract_text(source)
+    # extract() handles URLs, RSS feeds and raw text
+    result = await extractor.extract(body.source.strip())
 
     processing_time = (time.perf_counter() - start_time) * 1000
 

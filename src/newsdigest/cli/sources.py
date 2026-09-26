@@ -5,8 +5,10 @@ from pathlib import Path
 
 import click
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 
+from newsdigest.cli.utils import read_source
 from newsdigest.config.settings import Config
 from newsdigest.core.extractor import Extractor
 from newsdigest.exceptions import ExtractionError, IngestError
@@ -50,7 +52,7 @@ def sources(
     Shows named sources, unnamed/anonymous sources, and flags
     potential attribution issues.
 
-    SOURCE can be a URL or path to a text file.
+    SOURCE can be a URL, a path to a text file, raw text, or - for stdin.
 
     Examples:
 
@@ -59,19 +61,15 @@ def sources(
         newsdigest sources article.txt -f json
     """
     try:
-        # Check if source is a file
-        source_path = Path(source)
-        if source_path.exists() and source_path.is_file():
-            source_content = source_path.read_text(encoding="utf-8")
-        else:
-            source_content = source
+        # File path, "-" for stdin, URL or raw text
+        source_content = read_source(source)
 
         # Initialize extractor
-        config = Config()
+        config = Config.load()
         extractor = Extractor(config=config)
 
         if not quiet:
-            console.print(f"[dim]Analyzing sources in: {source[:80]}...[/dim]")
+            console.print(f"[dim]Analyzing sources in: {escape(source[:80])}...[/dim]")
 
         # Extract content
         result = extractor.extract_sync(source_content)
@@ -81,9 +79,7 @@ def sources(
         unnamed_count = result.statistics.unnamed_sources
 
         # Find sentences with unnamed sources
-        unnamed_sentences = [
-            s for s in result.sentences if s.has_unnamed_source
-        ]
+        unnamed_sentences = [s for s in result.sentences if s.has_unnamed_source]
 
         if output_format == "json":
             import json
@@ -92,8 +88,7 @@ def sources(
                 "named_sources": named_sources,
                 "unnamed_source_count": unnamed_count,
                 "unnamed_source_sentences": [
-                    {"index": s.index, "text": s.text}
-                    for s in unnamed_sentences
+                    {"index": s.index, "text": s.text} for s in unnamed_sentences
                 ],
                 "warnings": result.warnings,
             }
@@ -104,20 +99,20 @@ def sources(
                 if not quiet:
                     console.print(f"[green]Output written to: {output}[/green]")
             else:
-                console.print(formatted)
+                click.echo(formatted)
 
         elif output_format == "text":
             lines = ["Named Sources:", "-" * 40]
             if named_sources:
-                for src in named_sources:
-                    lines.append(f"  - {src}")
+                lines.extend(f"  - {src}" for src in named_sources)
             else:
                 lines.append("  (none found)")
 
             lines.extend(["", "Unnamed Source References:", "-" * 40])
             if unnamed_sentences:
-                for s in unnamed_sentences:
-                    lines.append(f"  [{s.index + 1}] {s.text[:100]}...")
+                lines.extend(
+                    f"  [{s.index + 1}] {s.text[:100]}..." for s in unnamed_sentences
+                )
             else:
                 lines.append("  (none found)")
 
@@ -128,7 +123,7 @@ def sources(
                 if not quiet:
                     console.print(f"[green]Output written to: {output}[/green]")
             else:
-                console.print(formatted)
+                click.echo(formatted)
 
         else:
             # Rich table output
@@ -141,7 +136,7 @@ def sources(
                 table.add_column("Source Name")
 
                 for i, src in enumerate(named_sources, 1):
-                    table.add_row(str(i), src)
+                    table.add_row(str(i), escape(src))
 
                 console.print(table)
             else:
@@ -157,7 +152,7 @@ def sources(
 
                 for s in unnamed_sentences:
                     text = s.text[:100] + "..." if len(s.text) > 100 else s.text
-                    table.add_row(str(s.index + 1), text)
+                    table.add_row(str(s.index + 1), escape(text))
 
                 console.print(table)
             else:
@@ -177,7 +172,7 @@ def sources(
                 for warning in result.warnings:
                     warn_type = warning.get("type")
                     warn_text = warning.get("text", "")[:50]
-                    console.print(f"  - {warn_type}: {warn_text}...")
+                    console.print(f"  - {warn_type}: {escape(warn_text)}...")
 
     except IngestError as e:
         console.print(f"[red]Failed to fetch content:[/red] {e}")

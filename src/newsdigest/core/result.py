@@ -1,13 +1,14 @@
 """Result data structures for NewsDigest extraction."""
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
+from typing import Any
 
 
 def _utc_now() -> datetime:
     """Return current UTC time (timezone-aware)."""
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class SentenceCategory(Enum):
@@ -54,7 +55,7 @@ class Sentence:
     # NLP data
     tokens: list[str] = field(default_factory=list)
     pos_tags: list[str] = field(default_factory=list)
-    entities: list[dict] = field(default_factory=list)
+    entities: list[dict[str, Any]] = field(default_factory=list)
 
     # Analysis scores (0.0 - 1.0)
     density_score: float = 0.0
@@ -84,7 +85,7 @@ class Claim:
     source: str | None = None
     source_type: str = "unknown"
 
-    # Confidence (0.0 - 1.0)
+    # Confidence, from 0.0 to 1.0
     confidence: float = 0.0
 
     # Position
@@ -146,7 +147,7 @@ class ExtractionResult:
     sources_named: list[str] = field(default_factory=list)
 
     # Warnings (kept but flagged)
-    warnings: list[dict] = field(default_factory=list)
+    warnings: list[dict[str, Any]] = field(default_factory=list)
 
     # Removed content
     removed: list[RemovedContent] = field(default_factory=list)

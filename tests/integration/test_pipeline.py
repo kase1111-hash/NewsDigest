@@ -78,7 +78,13 @@ class TestPipelineIntegration:
         assert result.statistics.emotional_words_removed >= 0
 
         # Check that some emotional words are removed from output
-        emotional_words = ["shocking", "unprecedented", "stunning", "bombshell", "alarmed"]
+        emotional_words = [
+            "shocking",
+            "unprecedented",
+            "stunning",
+            "bombshell",
+            "alarmed",
+        ]
         output_lower = result.text.lower()
 
         # At least some emotional words should be removed or flagged
@@ -188,9 +194,7 @@ class TestFormattingIntegration:
         assert isinstance(formatted, str)
         assert len(formatted) > 0
 
-    def test_stats_formatting(
-        self, extractor: Extractor, sample_content: str
-    ) -> None:
+    def test_stats_formatting(self, extractor: Extractor, sample_content: str) -> None:
         """Test statistics formatting."""
         result = extractor.extract_sync(sample_content)
         stats_output = extractor.format_stats(result, format="text")
@@ -285,4 +289,8 @@ class TestErrorHandlingIntegration:
         result = extractor.extract_sync(content)
 
         assert isinstance(result, ExtractionResult)
-        assert "15.5%" in result.text or "123.45" in result.text or result.statistics.original_words > 0
+        assert (
+            "15.5%" in result.text
+            or "123.45" in result.text
+            or result.statistics.original_words > 0
+        )

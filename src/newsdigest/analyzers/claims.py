@@ -1,6 +1,7 @@
 """Claim extractor for NewsDigest."""
 
 import re
+from typing import Any
 
 from newsdigest.analyzers.base import BaseAnalyzer
 from newsdigest.core.result import Claim, ClaimType, Sentence
@@ -18,10 +19,32 @@ STATISTICAL_PATTERNS: list[str] = [
 
 # Attribution verbs
 ATTRIBUTION_VERBS: list[str] = [
-    "said", "says", "stated", "announced", "declared", "claimed", "reported",
-    "confirmed", "denied", "acknowledged", "admitted", "argued", "asserted",
-    "contended", "maintained", "noted", "observed", "pointed out", "remarked",
-    "revealed", "suggested", "told", "wrote", "explained", "added", "warned",
+    "said",
+    "says",
+    "stated",
+    "announced",
+    "declared",
+    "claimed",
+    "reported",
+    "confirmed",
+    "denied",
+    "acknowledged",
+    "admitted",
+    "argued",
+    "asserted",
+    "contended",
+    "maintained",
+    "noted",
+    "observed",
+    "pointed out",
+    "remarked",
+    "revealed",
+    "suggested",
+    "told",
+    "wrote",
+    "explained",
+    "added",
+    "warned",
 ]
 
 
@@ -40,7 +63,7 @@ class ClaimExtractor(BaseAnalyzer):
     - Declarative language
     """
 
-    def __init__(self, config: dict | None = None) -> None:
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize claim extractor."""
         super().__init__(config)
         self._stat_patterns = [
@@ -74,9 +97,7 @@ class ClaimExtractor(BaseAnalyzer):
 
         return sentences
 
-    def _extract_claims(
-        self, sentence: Sentence, index: int
-    ) -> list[Claim]:
+    def _extract_claims(self, sentence: Sentence, index: int) -> list[Claim]:
         """Extract claims from a sentence.
 
         Args:
@@ -99,9 +120,11 @@ class ClaimExtractor(BaseAnalyzer):
         if quote_claim:
             claims.append(quote_claim)
 
-        # Check for attribution claims
+        # Check for attribution claims. Each claim carries the whole sentence
+        # and its source, so an attributed statistic or quote is already
+        # covered and a second claim would just repeat it.
         attr_claim = self._extract_attribution_claim(text, sentence, index)
-        if attr_claim and not quote_claim:  # Avoid duplicating attributed quotes
+        if attr_claim and not claims:
             claims.append(attr_claim)
 
         # Check for factual claims (if no other type found)

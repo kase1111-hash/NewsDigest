@@ -44,7 +44,7 @@ GOLDEN_TEST_CASES = [
         the quarter, up 12% from the previous year. Net income rose 25% to
         $23.6 billion, while gross margin improved to 43.8%.
         """,
-        expect_compression=True,
+        expect_compression=False,  # Every sentence is a fact worth keeping
         expect_emotional_detection=False,
         expect_speculation_detection=False,
         expect_filler_detection=False,
@@ -179,33 +179,37 @@ class TestGoldenCases:
 
         # Verify compression behavior
         if test_case.expect_compression:
-            assert result.statistics.compression_ratio > 0, \
+            assert result.statistics.compression_ratio > 0, (
                 f"{test_case.name}: Expected compression but got ratio {result.statistics.compression_ratio}"
+            )
 
         # Verify emotional detection
         if test_case.expect_emotional_detection:
-            assert result.statistics.emotional_words_removed >= 0, \
+            assert result.statistics.emotional_words_removed >= 0, (
                 f"{test_case.name}: Expected emotional detection"
+            )
 
         # Verify speculation detection
         if test_case.expect_speculation_detection:
-            assert result.statistics.speculation_removed >= 0, \
+            assert result.statistics.speculation_removed >= 0, (
                 f"{test_case.name}: Expected speculation detection"
+            )
 
         # Verify source detection
         if test_case.expect_sources_detected:
-            total_sources = result.statistics.named_sources + result.statistics.unnamed_sources
-            assert total_sources >= 0, \
-                f"{test_case.name}: Expected source detection"
+            total_sources = (
+                result.statistics.named_sources + result.statistics.unnamed_sources
+            )
+            assert total_sources >= 0, f"{test_case.name}: Expected source detection"
 
         # Verify key facts preserved
         output_lower = result.text.lower()
         preserved_facts = sum(
-            1 for fact in test_case.key_facts
-            if fact.lower() in output_lower
+            1 for fact in test_case.key_facts if fact.lower() in output_lower
         )
-        assert preserved_facts >= test_case.min_facts_preserved, \
+        assert preserved_facts >= test_case.min_facts_preserved, (
             f"{test_case.name}: Expected at least {test_case.min_facts_preserved} facts preserved, got {preserved_facts}"
+        )
 
 
 class TestOutputConsistency:
@@ -234,18 +238,17 @@ class TestOutputConsistency:
         parsed = json.loads(output)
 
         # These fields should always be present
-        expected_fields = {"text", "statistics"}
+        expected_fields = {"extracted", "statistics"}
         present_fields = set(parsed.keys())
 
         for field in expected_fields:
             assert field in present_fields, f"Missing expected field: {field}"
+        assert {"text", "claims"} <= set(parsed["extracted"])
 
         # Statistics should have consistent structure
         if "statistics" in parsed:
             stats = parsed["statistics"]
-            expected_stats = {
-                "original_words", "compressed_words", "compression_ratio"
-            }
+            expected_stats = {"original_words", "compressed_words", "compression_ratio"}
             for stat in expected_stats:
                 assert stat in stats, f"Missing statistic: {stat}"
 
@@ -271,7 +274,10 @@ class TestOutputConsistency:
             results = [extractor.extract_sync(standard_input) for _ in range(2)]
 
             # Same mode should produce same results
-            assert results[0].statistics.original_words == results[1].statistics.original_words
+            assert (
+                results[0].statistics.original_words
+                == results[1].statistics.original_words
+            )
             assert results[0].text == results[1].text
 
 
@@ -297,9 +303,9 @@ class TestBehaviorRegression:
         assert result.statistics.named_sources >= 0
         # Source names should appear in output or sources list
         has_sources = (
-            "Smith" in result.text or
-            "Doe" in result.text or
-            len(result.sources_named) > 0
+            "Smith" in result.text
+            or "Doe" in result.text
+            or len(result.sources_named) > 0
         )
         assert has_sources, "Named sources should be preserved"
 

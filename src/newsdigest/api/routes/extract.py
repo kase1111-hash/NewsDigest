@@ -6,8 +6,6 @@ import time
 
 from fastapi import APIRouter, Request
 
-logger = logging.getLogger(__name__)
-
 from newsdigest.api.models import (
     BatchExtractionRequest,
     BatchExtractionResponse,
@@ -23,13 +21,16 @@ from newsdigest.api.models import (
 )
 from newsdigest.api.utils import get_config
 from newsdigest.core.extractor import Extractor
+from newsdigest.core.result import ExtractionResult as CoreExtractionResult
 
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 
 def _result_to_api(
-    result: "ExtractionResult",  # type: ignore[name-defined]
+    result: CoreExtractionResult,
     processing_time_ms: float,
 ) -> ExtractionResult:
     """Convert internal ExtractionResult to API model.
@@ -42,40 +43,37 @@ def _result_to_api(
         API extraction result model.
     """
     # Convert sentences
-    sentences = []
-    for s in result.sentences:
-        sentences.append(
-            Sentence(
-                text=s.text,
-                kept=s.keep,
-                density_score=s.density_score,
-                has_hedge=s.speculation_score > 0.3,
-                has_speculation=s.speculation_score > 0.5,
-                has_emotion=s.emotional_score > 0.5,
-            )
+    sentences = [
+        Sentence(
+            text=s.text,
+            kept=s.keep,
+            density_score=s.density_score,
+            has_hedge=s.speculation_score > 0.3,
+            has_speculation=s.speculation_score > 0.5,
+            has_emotion=s.emotional_score > 0.5,
         )
+        for s in result.sentences
+    ]
 
     # Convert claims
-    claims = []
-    for c in result.claims:
-        claims.append(
-            Claim(
-                text=c.text,
-                type=c.claim_type.value,
-                confidence=c.confidence,
-                source_attribution=c.source,
-            )
+    claims = [
+        Claim(
+            text=c.text,
+            type=c.claim_type.value,
+            confidence=c.confidence,
+            source_attribution=c.source,
         )
+        for c in result.claims
+    ]
 
     # Convert removed content
-    removed = []
-    for r in result.removed:
-        removed.append(
-            RemovedContent(
-                text=r.text,
-                reason=r.reason.value.lower(),
-            )
+    removed = [
+        RemovedContent(
+            text=r.text,
+            reason=r.reason.value.lower(),
         )
+        for r in result.removed
+    ]
 
     # Build removal breakdown
     breakdown: dict[str, int] = {}
@@ -121,16 +119,12 @@ async def extract_content(
         Extraction response with results.
     """
     config = get_config(request)
-    extractor = Extractor(config)
+    extractor = Extractor(config, mode=body.mode.value)
 
     start_time = time.perf_counter()
 
-    # Determine if source is URL or text
-    source = body.source.strip()
-    if source.startswith(("http://", "https://")):
-        result = await extractor.extract(source)
-    else:
-        result = extractor.extract_text(source)
+    # extract() handles URLs, RSS feeds and raw text
+    result = await extractor.extract(body.source.strip())
 
     processing_time = (time.perf_counter() - start_time) * 1000
 
@@ -154,7 +148,7 @@ async def extract_batch(
         Batch extraction response with results for each source.
     """
     config = get_config(request)
-    extractor = Extractor(config)
+    extractor = Extractor(config, mode=body.mode.value)
 
     results: list[BatchResultItem] = []
     succeeded = 0
@@ -168,10 +162,7 @@ async def extract_batch(
         async with semaphore:
             start_time = time.perf_counter()
             try:
-                if source.startswith(("http://", "https://")):
-                    result = await extractor.extract(source)
-                else:
-                    result = extractor.extract_text(source)
+                result = await extractor.extract(source.strip())
 
                 processing_time = (time.perf_counter() - start_time) * 1000
                 api_result = _result_to_api(result, processing_time)

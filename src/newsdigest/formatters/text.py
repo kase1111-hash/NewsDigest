@@ -12,7 +12,7 @@ class TextFormatter(BaseFormatter):
     Provides clean, readable text output without Markdown formatting.
     """
 
-    def __init__(self, config: dict | None = None) -> None:
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize text formatter.
 
         Args:
@@ -65,8 +65,10 @@ class TextFormatter(BaseFormatter):
         if self.show_warnings and result.warnings:
             lines.append("WARNINGS:")
             lines.append("-" * 40)
-            for warning in result.warnings:
-                lines.append(f"- {warning.get('type', 'Warning')}: {warning.get('text', '')}")
+            lines.extend(
+                f"- {warning.get('type', 'Warning')}: {warning.get('text', '')}"
+                for warning in result.warnings
+            )
             lines.append("")
 
         # Statistics
@@ -98,7 +100,9 @@ class TextFormatter(BaseFormatter):
             ratio = (1 - stats.compressed_words / stats.original_words) * 100
             lines.append(f"  Compression ratio:   {ratio:.1f}%")
 
-        lines.append(f"  Semantic density:    {stats.original_density:.2f} -> {stats.compressed_density:.2f}")
+        lines.append(
+            f"  Semantic density:    {stats.original_density:.2f} -> {stats.compressed_density:.2f}"
+        )
         lines.append("")
 
         lines.append("  Breakdown:")
@@ -106,7 +110,9 @@ class TextFormatter(BaseFormatter):
         lines.append(f"    Named sources:     {stats.named_sources}")
         lines.append(f"    Unnamed sources:   {stats.unnamed_sources}")
         lines.append(f"    Emotional words:   {stats.emotional_words_removed} removed")
-        lines.append(f"    Speculation:       {stats.speculation_removed} sentences removed")
+        lines.append(
+            f"    Speculation:       {stats.speculation_removed} sentences removed"
+        )
         lines.append(f"    Repetition:        {stats.repetition_collapsed} collapsed")
         lines.append("")
 
@@ -147,7 +153,9 @@ class TextFormatter(BaseFormatter):
         kept = sum(1 for s in result.sentences if s.keep)
         removed = sum(1 for s in result.sentences if not s.keep)
         lines.append("-" * 40)
-        lines.append(f"Summary: {kept} kept, {removed} removed out of {len(result.sentences)} sentences")
+        lines.append(
+            f"Summary: {kept} kept, {removed} removed out of {len(result.sentences)} sentences"
+        )
         lines.append("=" * self.width)
 
         return "\n".join(lines)

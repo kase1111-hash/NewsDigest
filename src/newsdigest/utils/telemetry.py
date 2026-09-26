@@ -38,10 +38,11 @@ import threading
 import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from newsdigest.version import __version__
+
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -120,7 +121,14 @@ class TelemetryCollector:
     def _sanitize_properties(self, properties: dict[str, Any]) -> dict[str, Any]:
         """Sanitize properties to remove sensitive data."""
         sanitized = {}
-        sensitive_keys = {"password", "token", "api_key", "secret", "auth", "credential"}
+        sensitive_keys = {
+            "password",
+            "token",
+            "api_key",
+            "secret",
+            "auth",
+            "credential",
+        }
 
         for key, value in properties.items():
             key_lower = key.lower()
@@ -147,7 +155,7 @@ class TelemetryCollector:
         with self._lock:
             event = TelemetryEvent(
                 event_name=event_name,
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 session_id=self._current_session_id,
                 properties=self._sanitize_properties(properties or {}),
             )
@@ -168,7 +176,9 @@ class TelemetryCollector:
             return
 
         with self._lock:
-            self._feature_usage[feature_name] = self._feature_usage.get(feature_name, 0) + 1
+            self._feature_usage[feature_name] = (
+                self._feature_usage.get(feature_name, 0) + 1
+            )
 
         self.track_event("feature_used", {"feature": feature_name})
 
@@ -242,7 +252,7 @@ class TelemetryCollector:
 
             self._sessions[session_id] = SessionInfo(
                 session_id=session_id,
-                start_time=datetime.now(timezone.utc),
+                start_time=datetime.now(UTC),
                 properties=session_props,
             )
             self._current_session_id = session_id
@@ -259,7 +269,7 @@ class TelemetryCollector:
         with self._lock:
             if sid in self._sessions:
                 session = self._sessions[sid]
-                session.end_time = datetime.now(timezone.utc)
+                session.end_time = datetime.now(UTC)
 
                 duration = (session.end_time - session.start_time).total_seconds()
                 self.track_event(

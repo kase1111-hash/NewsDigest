@@ -5,13 +5,12 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-
-logger = logging.getLogger(__name__)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from newsdigest.api.models import ErrorResponse
 from newsdigest.api.routes import compare, digest, extract, health
+from newsdigest.api.utils import get_config
 from newsdigest.config.settings import Config
 from newsdigest.exceptions import (
     DigestError,
@@ -24,11 +23,18 @@ from newsdigest.storage.cache import MemoryCache
 from newsdigest.version import __version__
 
 
+# get_config is re-exported for backwards compatibility (it lives in api/utils.py)
+__all__ = ["app", "create_app", "get_config", "lifespan"]
+
+logger = logging.getLogger(__name__)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan handler."""
-    # Startup
-    app.state.config = Config()
+    # Startup: keep a config passed to create_app(), else load the user's
+    if getattr(app.state, "config", None) is None:
+        app.state.config = Config.load()
     config = app.state.config
     if config.cache_enabled:
         app.state.cache = MemoryCache(
@@ -58,7 +64,7 @@ def create_app(
     Returns:
         Configured FastAPI application.
     """
-    from newsdigest.api.middleware import (  # noqa: PLC0415
+    from newsdigest.api.middleware import (
         AuthMiddleware,
         RateLimitMiddleware,
         RequestTrackingMiddleware,
@@ -78,9 +84,9 @@ def create_app(
         lifespan=lifespan,
     )
 
-    # Store config
-    if config:
-        app.state.config = config
+    # Store config (CORS settings below are needed before startup runs)
+    config = config or Config.load()
+    app.state.config = config
 
     # Add middleware (order matters - first added = last executed)
     # Request tracking (outermost)
@@ -92,14 +98,14 @@ def create_app(
     # Authentication
     app.add_middleware(AuthMiddleware, enabled=enable_auth)
 
-    # CORS (innermost)
-    # Note: allow_credentials=True with allow_origins=["*"] is a security risk.
-    # Configure specific origins in production via config.cors_origins.
-    cors_origins = (
-        config.cors_origins
-        if config and hasattr(config, "cors_origins") and config.cors_origins
-        else ["http://localhost:3000", "http://localhost:8000"]
-    )
+    # CORS is added last, so it runs innermost
+    # Note: allowing credentials together with a wildcard origin is a
+    # security risk, so production deployments should list their origins
+    # in the cors_origins setting (NEWSDIGEST_CORS_ORIGINS).
+    cors_origins = config.cors_origins or [
+        "http://localhost:3000",
+        "http://localhost:8000",
+    ]
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_origins,
@@ -137,15 +143,13 @@ def _register_exception_handlers(app: FastAPI) -> None:
         )
 
     @app.exception_handler(IngestError)
-    async def ingest_error_handler(
-        request: Request, exc: IngestError
-    ) -> JSONResponse:
+    async def ingest_error_handler(request: Request, exc: IngestError) -> JSONResponse:
         return JSONResponse(
             status_code=422,
             content=ErrorResponse(
                 error="ingest_error",
                 message=str(exc),
-                details={"source": getattr(exc, "source", None)},
+                details={"source": exc.details.get("source")},
             ).model_dump(),
         )
 
@@ -162,9 +166,7 @@ def _register_exception_handlers(app: FastAPI) -> None:
         )
 
     @app.exception_handler(DigestError)
-    async def digest_error_handler(
-        request: Request, exc: DigestError
-    ) -> JSONResponse:
+    async def digest_error_handler(request: Request, exc: DigestError) -> JSONResponse:
         return JSONResponse(
             status_code=422,
             content=ErrorResponse(
@@ -186,9 +188,7 @@ def _register_exception_handlers(app: FastAPI) -> None:
         )
 
     @app.exception_handler(Exception)
-    async def generic_error_handler(
-        request: Request, exc: Exception
-    ) -> JSONResponse:
+    async def generic_error_handler(request: Request, exc: Exception) -> JSONResponse:
         # Log the exception with full traceback for debugging
         logger.exception(
             "Unexpected error during request to %s: %s",
@@ -206,7 +206,3 @@ def _register_exception_handlers(app: FastAPI) -> None:
 
 # Create default app instance
 app = create_app()
-
-
-# Re-export get_config for backwards compatibility
-from newsdigest.api.utils import get_config  # noqa: E402, F401

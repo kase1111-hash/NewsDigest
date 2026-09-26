@@ -1,6 +1,7 @@
 """Deduplication for NewsDigest."""
 
 import re
+from typing import Any
 
 from newsdigest.core.result import ExtractionResult
 
@@ -12,7 +13,7 @@ class Deduplicator:
     and merges metadata from duplicates.
     """
 
-    def __init__(self, config: dict | None = None) -> None:
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize deduplicator.
 
         Args:
@@ -21,9 +22,7 @@ class Deduplicator:
         self.config = config or {}
         self.threshold = self.config.get("similarity_threshold", 0.85)
 
-    def deduplicate(
-        self, articles: list[ExtractionResult]
-    ) -> list[ExtractionResult]:
+    def deduplicate(self, articles: list[ExtractionResult]) -> list[ExtractionResult]:
         """Remove duplicate articles, keeping the most complete.
 
         Args:
@@ -48,9 +47,7 @@ class Deduplicator:
                 result.append(articles[cluster_indices[0]])
             else:
                 # Merge cluster into single article
-                merged = self._merge_cluster(
-                    [articles[i] for i in cluster_indices]
-                )
+                merged = self._merge_cluster([articles[i] for i in cluster_indices])
                 result.append(merged)
 
         return result
@@ -65,14 +62,52 @@ class Deduplicator:
             Set of lowercase content words.
         """
         stop_words = {
-            "the", "a", "an", "is", "are", "was", "were", "be", "been",
-            "have", "has", "had", "do", "does", "did", "will", "would",
-            "could", "should", "to", "of", "in", "for", "on", "with", "at",
-            "by", "from", "as", "and", "but", "or", "that", "this", "it",
-            "they", "them", "he", "she", "we", "you", "said", "says",
+            "the",
+            "a",
+            "an",
+            "is",
+            "are",
+            "was",
+            "were",
+            "be",
+            "been",
+            "have",
+            "has",
+            "had",
+            "do",
+            "does",
+            "did",
+            "will",
+            "would",
+            "could",
+            "should",
+            "to",
+            "of",
+            "in",
+            "for",
+            "on",
+            "with",
+            "at",
+            "by",
+            "from",
+            "as",
+            "and",
+            "but",
+            "or",
+            "that",
+            "this",
+            "it",
+            "they",
+            "them",
+            "he",
+            "she",
+            "we",
+            "you",
+            "said",
+            "says",
         }
 
-        words = re.findall(r'\b\w+\b', text.lower())
+        words = re.findall(r"\b\w+\b", text.lower())
         return {w for w in words if w not in stop_words and len(w) > 2}
 
     def _jaccard_similarity(self, set1: set[str], set2: set[str]) -> float:
@@ -135,9 +170,7 @@ class Deduplicator:
 
         return list(clusters_dict.values())
 
-    def _merge_cluster(
-        self, articles: list[ExtractionResult]
-    ) -> ExtractionResult:
+    def _merge_cluster(self, articles: list[ExtractionResult]) -> ExtractionResult:
         """Merge a cluster of similar articles into one.
 
         Args:

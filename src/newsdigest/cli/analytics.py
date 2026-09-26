@@ -2,18 +2,29 @@
 
 import sys
 from pathlib import Path
+from typing import TypedDict
 
 import click
 from rich.console import Console
+from rich.markup import escape
 from rich.panel import Panel
 from rich.table import Table
 
+from newsdigest.cli.utils import read_source
 from newsdigest.config.settings import Config
 from newsdigest.core.extractor import Extractor
+from newsdigest.core.result import ExtractionResult
 from newsdigest.exceptions import ExtractionError, IngestError
 
 
 console = Console()
+
+
+class _AnalyzedSource(TypedDict):
+    """A successfully analyzed source and its extraction result."""
+
+    source: str
+    result: ExtractionResult
 
 
 @click.command()
@@ -51,7 +62,7 @@ def analytics(
     Provides insights across multiple sources including average
     compression ratios, common removal reasons, and source quality metrics.
 
-    SOURCES can be URLs or paths to text files.
+    SOURCES can be URLs, paths to text files, or raw text.
 
     Examples:
 
@@ -66,23 +77,19 @@ def analytics(
 
     try:
         # Initialize extractor
-        config = Config()
+        config = Config.load()
         extractor = Extractor(config=config)
 
-        results = []
-        failed = []
+        results: list[_AnalyzedSource] = []
+        failed: list[dict[str, str]] = []
 
         for source in sources:
             try:
-                # Check if source is a file
-                source_path = Path(source)
-                if source_path.exists() and source_path.is_file():
-                    source_content = source_path.read_text(encoding="utf-8")
-                else:
-                    source_content = source
+                # File path, "-" for stdin, URL or raw text
+                source_content = read_source(source)
 
                 if not quiet:
-                    console.print(f"[dim]Analyzing: {source[:60]}...[/dim]")
+                    console.print(f"[dim]Analyzing: {escape(source[:60])}...[/dim]")
 
                 result = extractor.extract_sync(source_content)
                 results.append({"source": source, "result": result})
@@ -90,7 +97,9 @@ def analytics(
             except (IngestError, ExtractionError) as e:
                 failed.append({"source": source, "error": str(e)})
                 if not quiet:
-                    console.print(f"[yellow]Skipped: {source[:40]}... ({e})[/yellow]")
+                    console.print(
+                        f"[yellow]Skipped: {escape(source[:40])}... ({escape(str(e))})[/yellow]"
+                    )
 
         if not results:
             console.print("[red]No articles could be analyzed.[/red]")
@@ -109,9 +118,7 @@ def analytics(
         total_emotional = sum(
             r["result"].statistics.emotional_words_removed for r in results
         )
-        total_unnamed = sum(
-            r["result"].statistics.unnamed_sources for r in results
-        )
+        total_unnamed = sum(r["result"].statistics.unnamed_sources for r in results)
         total_named = sum(r["result"].statistics.named_sources for r in results)
 
         # Per-article stats
@@ -161,7 +168,7 @@ def analytics(
                 if not quiet:
                     console.print(f"[green]Output written to: {output}[/green]")
             else:
-                console.print(formatted)
+                click.echo(formatted)
 
         elif output_format == "text":
             lines = [
@@ -187,7 +194,7 @@ def analytics(
                 if not quiet:
                     console.print(f"[green]Output written to: {output}[/green]")
             else:
-                console.print(formatted)
+                click.echo(formatted)
 
         else:
             # Rich table output
@@ -222,7 +229,7 @@ def analytics(
                 source_short = src[:37] + "..." if len(src) > 40 else src
                 stats = r["result"].statistics
                 table.add_row(
-                    source_short,
+                    escape(source_short),
                     str(stats.original_words),
                     str(stats.compressed_words),
                     f"{stats.compression_ratio:.1%}",
@@ -235,7 +242,7 @@ def analytics(
                 console.print()
                 console.print("[yellow]Failed sources:[/yellow]")
                 for f in failed:
-                    console.print(f"  - {f['source'][:50]}...")
+                    console.print(f"  - {escape(f['source'][:50])}...")
 
     except Exception as e:
         console.print(f"[red]Error:[/red] {e}")

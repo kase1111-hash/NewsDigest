@@ -6,12 +6,12 @@ Provides authentication, rate limiting, and request tracking.
 import hashlib
 import time
 from collections import defaultdict
-from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from fastapi import Request, status
-from fastapi.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
+from fastapi.responses import JSONResponse, Response
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from starlette.types import ASGIApp
 
 from newsdigest.api.models import ErrorResponse
 
@@ -66,7 +66,7 @@ class APIKeyManager:
         Returns:
             New API key object.
         """
-        import secrets  # noqa: PLC0415
+        import secrets
 
         # Generate a secure random key
         raw_key = secrets.token_urlsafe(32)
@@ -132,7 +132,7 @@ class APIKeyManager:
             return True
         return False
 
-    def list_keys(self) -> list[dict[str, str | int | bool]]:
+    def list_keys(self) -> list[dict[str, str | float | bool | list[str]]]:
         """List all API keys (without the actual key values).
 
         Returns:
@@ -173,7 +173,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
     def __init__(
         self,
-        app: Callable,
+        app: ASGIApp,
         key_manager: APIKeyManager | None = None,
         exclude_paths: list[str] | None = None,
         enabled: bool = True,
@@ -196,7 +196,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
         ]
         self.enabled = enabled
 
-    async def dispatch(self, request: Request, call_next: Callable) -> JSONResponse:
+    async def dispatch(
+        self, request: Request, call_next: RequestResponseEndpoint
+    ) -> Response:
         """Process request through auth middleware."""
         if not self.enabled:
             return await call_next(request)
@@ -383,7 +385,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
     def __init__(
         self,
-        app: Callable,
+        app: ASGIApp,
         limiter: RateLimiter | None = None,
         exclude_paths: list[str] | None = None,
         enabled: bool = True,
@@ -406,7 +408,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         ]
         self.enabled = enabled
 
-    async def dispatch(self, request: Request, call_next: Callable) -> JSONResponse:
+    async def dispatch(
+        self, request: Request, call_next: RequestResponseEndpoint
+    ) -> Response:
         """Process request through rate limit middleware."""
         if not self.enabled:
             return await call_next(request)
@@ -432,7 +436,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         )
 
         if not allowed:
-            response = JSONResponse(
+            response: Response = JSONResponse(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 content=ErrorResponse(
                     error="rate_limit_exceeded",
@@ -502,7 +506,7 @@ class RequestTracker:
         if len(latencies) > 1000:
             self._latencies[key] = latencies[-1000:]
 
-    def get_stats(self) -> dict[str, float | int | dict]:
+    def get_stats(self) -> dict[str, float | int | dict[str, int]]:
         """Get aggregated statistics.
 
         Returns:
@@ -515,9 +519,7 @@ class RequestTracker:
         for latencies in self._latencies.values():
             all_latencies.extend(latencies)
 
-        avg_latency = (
-            sum(all_latencies) / len(all_latencies) if all_latencies else 0.0
-        )
+        avg_latency = sum(all_latencies) / len(all_latencies) if all_latencies else 0.0
 
         uptime = time.time() - self._start_time
 
@@ -548,7 +550,7 @@ class RequestTrackingMiddleware(BaseHTTPMiddleware):
 
     def __init__(
         self,
-        app: Callable,
+        app: ASGIApp,
         tracker: RequestTracker | None = None,
     ) -> None:
         """Initialize tracking middleware.
@@ -560,7 +562,9 @@ class RequestTrackingMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.tracker = tracker or request_tracker
 
-    async def dispatch(self, request: Request, call_next: Callable) -> JSONResponse:
+    async def dispatch(
+        self, request: Request, call_next: RequestResponseEndpoint
+    ) -> Response:
         """Process request and record metrics."""
         start_time = time.perf_counter()
 

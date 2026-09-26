@@ -1,7 +1,9 @@
 """Main extraction engine for NewsDigest."""
 
 import asyncio
+import concurrent.futures
 import re
+from typing import Any
 from urllib.parse import urlparse
 
 from newsdigest.config.settings import Config
@@ -33,6 +35,9 @@ from newsdigest.utils.logging import (
 # Module logger
 logger = get_logger(__name__)
 
+# Supported extraction modes, from least to most aggressive compression
+EXTRACTION_MODES = ("conservative", "standard", "aggressive")
+
 
 class Extractor:
     """Main extraction engine that orchestrates the extraction pipeline.
@@ -48,15 +53,25 @@ class Extractor:
     def __init__(
         self,
         config: Config | None = None,
-        mode: str = "standard",
+        mode: str | None = None,
     ) -> None:
         """Initialize extractor with configuration.
 
         Args:
             config: Configuration object. Uses defaults if not provided.
             mode: Extraction mode - 'conservative', 'standard', or 'aggressive'.
+                Defaults to the configured mode (config.extraction.mode).
+
+        Raises:
+            ValueError: If mode is not a supported extraction mode.
         """
         self.config = config or Config()
+        mode = mode or self.config.extraction.mode
+        if mode not in EXTRACTION_MODES:
+            raise ValueError(
+                f"Unknown extraction mode: {mode!r} "
+                f"(expected one of: {', '.join(EXTRACTION_MODES)})"
+            )
         self.mode = mode
 
         # Build config dict for components
@@ -76,7 +91,7 @@ class Extractor:
             "text": TextFormatter(self._config_dict.get("output", {})),
         }
 
-    def _build_config_dict(self) -> dict:
+    def _build_config_dict(self) -> dict[str, Any]:
         """Build configuration dictionary from Config object."""
         config_dict = {
             "extraction": {
@@ -143,7 +158,10 @@ class Extractor:
             capture_exception(
                 e,
                 severity=ErrorSeverity.ERROR,
-                extra={"source": source[:100] if source else None, "source_type": source_type},
+                extra={
+                    "source": source[:100] if source else None,
+                    "source_type": source_type,
+                },
                 tags={"operation": "ingest"},
             )
             if isinstance(e, IngestError):
@@ -152,7 +170,7 @@ class Extractor:
                 f"Failed to ingest source: {e}",
                 cause=e,
                 details={"source": source[:100] if source else None},
-            )
+            ) from e
 
         try:
             # Process through pipeline
@@ -181,7 +199,10 @@ class Extractor:
             capture_exception(
                 e,
                 severity=ErrorSeverity.ERROR,
-                extra={"article_id": article.id, "source": source[:100] if source else None},
+                extra={
+                    "article_id": article.id,
+                    "source": source[:100] if source else None,
+                },
                 tags={"operation": "extraction"},
             )
             if isinstance(e, ExtractionError):
@@ -190,7 +211,7 @@ class Extractor:
                 f"Failed to extract content: {e}",
                 cause=e,
                 details={"article_id": article.id},
-            )
+            ) from e
 
     def extract_sync(self, source: str) -> ExtractionResult:
         """Synchronous version of extract.
@@ -205,7 +226,20 @@ class Extractor:
             IngestError: If content cannot be fetched or parsed.
             ExtractionError: If content cannot be processed.
         """
-        return asyncio.run(self.extract(source))
+        try:
+            asyncio.get_running_loop()
+            in_event_loop = True
+        except RuntimeError:
+            in_event_loop = False
+
+        if not in_event_loop:
+            return asyncio.run(self.extract(source))
+
+        # asyncio.run() cannot be nested inside a running event loop (async
+        # web frameworks, Jupyter), so run the coroutine on a worker thread
+        # with its own loop. Async callers should prefer `await extract()`.
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            return pool.submit(asyncio.run, self.extract(source)).result()
 
     async def extract_batch(
         self,
@@ -238,7 +272,9 @@ class Extractor:
                     except Exception as e:
                         capture_exception(
                             e,
-                            severity=ErrorSeverity.WARNING if not fail_fast else ErrorSeverity.ERROR,
+                            severity=ErrorSeverity.WARNING
+                            if not fail_fast
+                            else ErrorSeverity.ERROR,
                             extra={"source": src[:100] if src else None},
                             tags={"operation": "batch_extraction"},
                         )
@@ -247,12 +283,16 @@ class Extractor:
                                 f"Batch extraction failed: {e}",
                                 cause=e,
                                 details={"source": src[:100] if src else None},
-                            )
+                            ) from e
                         return None
 
             tasks = [extract_one(src) for src in sources]
-            results = await asyncio.gather(*tasks, return_exceptions=not fail_fast)
-            return [r for r in results if r is not None and not isinstance(r, Exception)]
+            outcomes = await asyncio.gather(*tasks, return_exceptions=not fail_fast)
+            return [
+                r
+                for r in outcomes
+                if r is not None and not isinstance(r, BaseException)
+            ]
         else:
             results = []
             for src in sources:
@@ -262,7 +302,9 @@ class Extractor:
                 except Exception as e:
                     capture_exception(
                         e,
-                        severity=ErrorSeverity.WARNING if not fail_fast else ErrorSeverity.ERROR,
+                        severity=ErrorSeverity.WARNING
+                        if not fail_fast
+                        else ErrorSeverity.ERROR,
                         extra={"source": src[:100] if src else None},
                         tags={"operation": "batch_extraction"},
                     )
@@ -271,7 +313,7 @@ class Extractor:
                             f"Batch extraction failed: {e}",
                             cause=e,
                             details={"source": src[:100] if src else None},
-                        )
+                        ) from e
                     continue
             return results
 
@@ -446,7 +488,7 @@ class Extractor:
                 )
         return removed
 
-    def _build_warnings(self, sentences: list[Sentence]) -> list[dict]:
+    def _build_warnings(self, sentences: list[Sentence]) -> list[dict[str, str]]:
         """Build warnings list from sentences.
 
         Args:
@@ -455,19 +497,17 @@ class Extractor:
         Returns:
             List of warning dictionaries.
         """
-        warnings = []
-        for sentence in sentences:
-            if sentence.has_unnamed_source and sentence.keep:
-                warnings.append(
-                    {
-                        "type": "UNNAMED_SOURCE",
-                        "text": sentence.text[:100] + "..."
-                        if len(sentence.text) > 100
-                        else sentence.text,
-                        "location": f"sentence {sentence.index + 1}",
-                    }
-                )
-        return warnings
+        return [
+            {
+                "type": "UNNAMED_SOURCE",
+                "text": sentence.text[:100] + "..."
+                if len(sentence.text) > 100
+                else sentence.text,
+                "location": f"sentence {sentence.index + 1}",
+            }
+            for sentence in sentences
+            if sentence.has_unnamed_source and sentence.keep
+        ]
 
     def _get_named_sources(self, sentences: list[Sentence]) -> list[str]:
         """Get list of named sources from sentences.
@@ -510,8 +550,8 @@ class Extractor:
             1 - compressed_words / original_words if original_words > 0 else 0
         )
 
-        # Calculate densities
-        original_density = self._calculate_density(article.content, [])
+        # Calculate densities: the same claims spread over fewer words
+        original_density = self._calculate_density(article.content, claims)
         compressed_density = self._calculate_density(
             " ".join(s.text for s in kept_sentences), claims
         )
@@ -570,12 +610,13 @@ class Extractor:
         if claim_count == 0:
             # FIXME: Entity-based density estimation is a rough heuristic;
             # consider using sentence-transformers for semantic density scoring
-            entity_pattern = r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b'
+            entity_pattern = r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b"
             entities = re.findall(entity_pattern, text)
             claim_count = len(set(entities)) // 3  # Rough estimate
 
+        # Heuristic estimates have no confidence scores of their own
         avg_confidence = (
-            sum(c.confidence for c in claims) / claim_count if claim_count > 0 else 0.5
+            sum(c.confidence for c in claims) / len(claims) if claims else 0.5
         )
 
         raw_density = (claim_count * avg_confidence) / word_count

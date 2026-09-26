@@ -5,8 +5,10 @@ from pathlib import Path
 
 import click
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 
+from newsdigest.cli.utils import read_source
 from newsdigest.config.settings import Config
 from newsdigest.core.extractor import Extractor
 from newsdigest.exceptions import ExtractionError, IngestError
@@ -29,8 +31,8 @@ console = Console()
     "-m",
     "--mode",
     type=click.Choice(["conservative", "standard", "aggressive"]),
-    default="standard",
-    help="Extraction mode.",
+    default=None,
+    help="Extraction mode (default: configured mode).",
 )
 @click.option(
     "-o",
@@ -49,7 +51,7 @@ def compare(
     ctx: click.Context,
     source: str,
     output_format: str,
-    mode: str,
+    mode: str | None,
     output: str | None,
     quiet: bool,
 ) -> None:
@@ -58,7 +60,7 @@ def compare(
     Displays which sentences were kept and which were removed,
     with annotations explaining why content was filtered.
 
-    SOURCE can be a URL or path to a text file.
+    SOURCE can be a URL, a path to a text file, raw text, or - for stdin.
 
     Examples:
 
@@ -67,19 +69,15 @@ def compare(
         newsdigest compare article.txt -f markdown -o comparison.md
     """
     try:
-        # Check if source is a file
-        source_path = Path(source)
-        if source_path.exists() and source_path.is_file():
-            source_content = source_path.read_text(encoding="utf-8")
-        else:
-            source_content = source
+        # File path, "-" for stdin, URL or raw text
+        source_content = read_source(source)
 
         # Initialize extractor
-        config = Config()
+        config = Config.load()
         extractor = Extractor(config=config, mode=mode)
 
         if not quiet:
-            console.print(f"[dim]Analyzing: {source[:80]}...[/dim]")
+            console.print(f"[dim]Analyzing: {escape(source[:80])}...[/dim]")
 
         # Extract with comparison data
         result = extractor.compare(source_content)
@@ -91,7 +89,7 @@ def compare(
                 if not quiet:
                     console.print(f"[green]Output written to: {output}[/green]")
             else:
-                console.print(formatted)
+                click.echo(formatted)
         else:
             # Rich table output
             table = Table(title="Sentence Analysis", show_lines=True)
@@ -101,14 +99,11 @@ def compare(
             table.add_column("Reason", width=20)
 
             for sentence in result.sentences:
-                if sentence.keep:
-                    status = "[green]KEEP[/green]"
-                else:
-                    status = "[red]REMOVE[/red]"
+                status = "[green]KEEP[/green]" if sentence.keep else "[red]REMOVE[/red]"
                 reason = sentence.removal_reason or "-"
                 txt = sentence.text
                 text = txt[:100] + "..." if len(txt) > 100 else txt
-                table.add_row(str(sentence.index + 1), status, text, reason)
+                table.add_row(str(sentence.index + 1), status, escape(text), reason)
 
             if output:
                 # For file output, use plain text

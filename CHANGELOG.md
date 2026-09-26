@@ -30,10 +30,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CLI commands: extract, compare, stats, digest, sources, watch, analytics, setup
 - `ValidationError` exception for input validation
 - Polyform Small Business License 1.0.0
+- `Config.load()`: reads `~/.newsdigest/config.yml` (or `$NEWSDIGEST_CONFIG`)
+  and applies `NEWSDIGEST_*` environment overrides; used by the CLI and API
+- `NEWSDIGEST_CORS_ORIGINS` setting for the API
+- CLI accepts `-` as SOURCE to read an article from standard input
+
+### Changed
+- Extraction modes (`conservative`, `standard`, `aggressive`) now tune the
+  analyzers; previously every mode behaved like `standard`
+- `Extractor` and the CLI default to the configured mode; unknown modes raise
+- `newsdigest setup` writes `~/.newsdigest/config.yml` (the file that is read)
+- Only `NEWSDIGEST_`-prefixed environment variables configure NewsDigest
+- Emotional language: sensational adjectives are always stripped,
+  sensational lead-in clauses and reaction-only sentences are removed, and
+  direct quotes are never edited
+- Ruff is pinned (CI, pre-commit, dev requirements)
 
 ### Fixed
 - Circular import in API routes (moved `get_config` to `api/utils.py`)
 - Linting issues in API routes and middleware
+- API `/extract`, `/compare` and `/extract/batch` failed with a 500 error for
+  every text source (`asyncio.run()` inside the server's event loop)
+- API ignored the request `mode`, a config passed to `create_app()`, and the
+  digest options `max_articles` and `cluster_threshold`
+- Plain text: the first wrapped line was taken as the title, cutting the
+  first sentence in half; layout whitespace leaked into the output
+- HTML: text inside inline tags was extracted twice; class-name heuristics
+  removed headlines and could remove whole articles
+- Crash (`RecursionError`) on long articles with repeated sentences
+- Closing quotes attached to the following sentence
+- Duplicate claims per sentence; original density always reported as 0
+- SSRF: URL validation now blocks IPv6, link-local/cloud-metadata, CGNAT and
+  alternate IPv4 encodings, and re-validates every redirect; RSS feeds are
+  fetched through the validated client
+- HTML sanitizer missed `<embed>`, `<style>`, inline styles and nested tags;
+  pasted text input was not sanitized
+- CLI: JSON output was hard-wrapped (invalid JSON), article text was parsed
+  as markup, and long raw-text arguments crashed
+- CLI and API ignored the user config file and environment variables;
+  `Config.save()` wrote files that could not be loaded
+- In-memory `Database` lost its tables between calls
+- Required secrets never raised; `sk-proj-` keys were not masked
+- RSS dates were converted as local time instead of UTC
+- CI: lint, type-check and security jobs failed, and the test job lacked
+  FastAPI, so tests never ran
 
 ## [0.1.0] - 2024-01-15
 

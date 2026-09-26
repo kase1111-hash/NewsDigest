@@ -4,12 +4,17 @@ Sends digest summaries via email using SMTP or async SMTP.
 Requires: pip install newsdigest[email]
 """
 
-import asyncio
 import smtplib
 import ssl
 from dataclasses import dataclass, field
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from typing import TYPE_CHECKING
+
+
+if TYPE_CHECKING:
+    import asyncio
+
 
 try:
     import aiosmtplib
@@ -281,8 +286,8 @@ class EmailSender:
         html_lines = []
         in_list = False
 
-        for line in markdown.split("\n"):
-            line = line.rstrip()
+        for raw_line in markdown.split("\n"):
+            line = raw_line.rstrip()
 
             # Headers
             if line.startswith("### "):

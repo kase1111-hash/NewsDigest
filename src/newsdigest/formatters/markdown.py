@@ -16,7 +16,7 @@ class MarkdownFormatter(BaseFormatter):
     - Statistics
     """
 
-    def __init__(self, config: dict | None = None) -> None:
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize Markdown formatter.
 
         Args:
@@ -71,8 +71,10 @@ class MarkdownFormatter(BaseFormatter):
         if self.show_warnings and result.warnings:
             lines.append("## ⚠️ WARNINGS")
             lines.append("─" * 40)
-            for warning in result.warnings:
-                lines.append(f"- **{warning.get('type', 'Warning')}**: {warning.get('text', '')}")
+            lines.extend(
+                f"- **{warning.get('type', 'Warning')}**: {warning.get('text', '')}"
+                for warning in result.warnings
+            )
             lines.append("")
 
         # Statistics
@@ -104,7 +106,9 @@ class MarkdownFormatter(BaseFormatter):
             ratio = (1 - stats.compressed_words / stats.original_words) * 100
             lines.append(f"Compression ratio:      {ratio:.1f}%")
 
-        lines.append(f"Semantic density:       {stats.original_density:.2f} → {stats.compressed_density:.2f}")
+        lines.append(
+            f"Semantic density:       {stats.original_density:.2f} → {stats.compressed_density:.2f}"
+        )
         lines.append("")
 
         # Breakdown
@@ -112,8 +116,12 @@ class MarkdownFormatter(BaseFormatter):
         lines.append(f"- Novel claims:          {stats.novel_claims}")
         lines.append(f"- Named sources:         {stats.named_sources}")
         lines.append(f"- Unnamed sources:       {stats.unnamed_sources}")
-        lines.append(f"- Emotional words:       {stats.emotional_words_removed} removed")
-        lines.append(f"- Speculation:           {stats.speculation_removed} sentences removed")
+        lines.append(
+            f"- Emotional words:       {stats.emotional_words_removed} removed"
+        )
+        lines.append(
+            f"- Speculation:           {stats.speculation_removed} sentences removed"
+        )
         lines.append(f"- Repetition:            {stats.repetition_collapsed} collapsed")
         lines.append(f"- Background:            {stats.background_removed} removed")
         lines.append("")
@@ -145,7 +153,9 @@ class MarkdownFormatter(BaseFormatter):
         lines.append("|----------|--------|-----------|")
 
         for sentence in result.sentences:
-            original = sentence.text[:50] + "..." if len(sentence.text) > 50 else sentence.text
+            original = (
+                sentence.text[:50] + "..." if len(sentence.text) > 50 else sentence.text
+            )
             original = original.replace("|", "\\|").replace("\n", " ")
 
             if sentence.keep:
@@ -162,7 +172,9 @@ class MarkdownFormatter(BaseFormatter):
         # Summary
         kept = sum(1 for s in result.sentences if s.keep)
         removed = sum(1 for s in result.sentences if not s.keep)
-        lines.append(f"**Summary:** {kept} kept, {removed} removed out of {len(result.sentences)} sentences")
+        lines.append(
+            f"**Summary:** {kept} kept, {removed} removed out of {len(result.sentences)} sentences"
+        )
         lines.append("")
 
         lines.append("━" * 60)
@@ -211,7 +223,9 @@ class MarkdownFormatter(BaseFormatter):
         lines.append(f"- Words delivered: {digest.total_compressed_words:,}")
 
         if digest.total_original_words > 0:
-            ratio = (1 - digest.total_compressed_words / digest.total_original_words) * 100
+            ratio = (
+                1 - digest.total_compressed_words / digest.total_original_words
+            ) * 100
             lines.append(f"- Compression: {ratio:.1f}%")
 
         lines.append("")

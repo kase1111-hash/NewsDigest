@@ -34,18 +34,21 @@ class TestEmotionalDetector:
         assert detector.enabled is True
         assert detector.mode == "remove"
 
-    @pytest.mark.parametrize("text", [
-        "In a shocking development, the CEO resigned.",
-        "The stunning announcement caught investors off guard.",
-        "This unprecedented move signals a major shift.",
-        "The bombshell revelation rocked the industry.",
-        "This extraordinary development changes everything.",
-        "The devastating impact was felt across markets.",
-        "In a dramatic reversal, the board voted no.",
-        "The sensational claims were widely reported.",
-        "A staggering loss of $50 billion was reported.",
-        # Note: "alarmed" (past tense) is NOT in the word lists — only "alarming" is.
-    ])
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "In a shocking development, the CEO resigned.",
+            "The stunning announcement caught investors off guard.",
+            "This unprecedented move signals a major shift.",
+            "The bombshell revelation rocked the industry.",
+            "This extraordinary development changes everything.",
+            "The devastating impact was felt across markets.",
+            "In a dramatic reversal, the board voted no.",
+            "The sensational claims were widely reported.",
+            "A staggering loss of $50 billion was reported.",
+            # Note: "alarmed" (past tense) is NOT in the word lists — only "alarming" is.
+        ],
+    )
     def test_emotional_language_detected(self, detector, text):
         """Test that sentences with emotional activation words score above threshold."""
         sentences = [_make_sentence(text)]
@@ -53,13 +56,16 @@ class TestEmotionalDetector:
         assert result[0].emotional_score >= detector.threshold
         assert result[0].category == SentenceCategory.EMOTIONAL
 
-    @pytest.mark.parametrize("text", [
-        "The Federal Reserve announced a rate increase.",
-        "Revenue increased 15% year over year to $10 billion.",
-        "The company reported quarterly earnings on Tuesday.",
-        "Congress passed the bill with a 60-40 vote.",
-        "The population grew by 2.3% according to census data.",
-    ])
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "The Federal Reserve announced a rate increase.",
+            "Revenue increased 15% year over year to $10 billion.",
+            "The company reported quarterly earnings on Tuesday.",
+            "Congress passed the bill with a 60-40 vote.",
+            "The population grew by 2.3% according to census data.",
+        ],
+    )
     def test_neutral_sentences_kept(self, detector, text):
         """Test that neutral factual sentences are not flagged as emotional."""
         sentences = [_make_sentence(text)]
@@ -69,9 +75,9 @@ class TestEmotionalDetector:
 
     def test_multiple_emotional_words_detected(self, detector):
         """Test that sentences with multiple emotional words all get flagged."""
-        sentences = [_make_sentence(
-            "The shocking unprecedented scandal was devastating."
-        )]
+        sentences = [
+            _make_sentence("The shocking unprecedented scandal was devastating.")
+        ]
         detector.analyze(sentences)
         # 3 emotional words out of 6 total -> high score
         assert sentences[0].emotional_score >= detector.threshold
@@ -97,24 +103,63 @@ class TestEmotionalDetector:
         result = detector.analyze([sentence])
         assert result[0].removal_reason == RemovalReason.SPECULATION.value
 
-    def test_sentence_with_only_emotional_words_stays_when_removal_fails(self, detector):
-        """Test behavior when emotional words have trailing punctuation.
+    def test_sentence_with_only_emotional_words_removed(self, detector):
+        """Test that emotional words with trailing punctuation are removed.
 
-        remove_words uses \\b regex anchors which don't match after punctuation
-        like '!', so words like 'Shocking!' are not removed from the text. The
-        sentence keeps its content and stays.
+        Tokens like "Shocking!" must still match on word boundaries; once
+        they are stripped nothing meaningful remains, so the sentence goes.
         """
         sentences = [_make_sentence("Shocking! Devastating! Unprecedented!")]
         result = detector.analyze(sentences)
         assert result[0].category == SentenceCategory.EMOTIONAL
-        # The words fail to strip due to punctuation in the token, so text remains
-        assert result[0].keep is True
+        assert result[0].keep is False
+        assert result[0].removal_reason == RemovalReason.EMOTIONAL_ACTIVATION.value
+
+    @pytest.mark.parametrize(
+        "text,expected",
+        [
+            (
+                "In a shocking development, the Federal Reserve held rates at 5.25%.",
+                "The Federal Reserve held rates at 5.25%.",
+            ),
+            (
+                "An unprecedented rise of 40% was reported.",
+                "A rise of 40% was reported.",
+            ),
+            (
+                "Despite the shocking loss of $5 billion, the company expanded.",
+                "Despite the loss of $5 billion, the company expanded.",
+            ),
+        ],
+    )
+    def test_emotional_wrapper_removed(self, detector, text, expected):
+        """Test that lead-in clauses and adjectives go, keeping the facts."""
+        sentences = [_make_sentence(text)]
+        detector.analyze(sentences)
+        assert sentences[0].keep is True
+        assert sentences[0].text == expected
+
+    def test_direct_quotes_not_edited(self, detector):
+        """Test that emotional words inside direct quotes are preserved."""
+        text = '"This is an incredible result," Cook said.'
+        sentences = [_make_sentence(text)]
+        detector.analyze(sentences)
+        assert sentences[0].text == text
+
+    def test_reaction_only_sentence_removed(self, detector):
+        """Test that sentences only reporting a reaction are removed."""
+        sentences = [
+            _make_sentence("The announcement sent shockwaves through markets.")
+        ]
+        detector.analyze(sentences)
+        assert sentences[0].keep is False
+        assert sentences[0].removal_reason == RemovalReason.EMOTIONAL_ACTIVATION.value
 
     def test_emotional_word_stripped_from_clean_sentence(self, detector):
         """Test that emotional words without punctuation are stripped from text."""
-        sentences = [_make_sentence(
-            "The shocking scandal rocked the technology industry."
-        )]
+        sentences = [
+            _make_sentence("The shocking scandal rocked the technology industry.")
+        ]
         result = detector.analyze(sentences)
         assert result[0].category == SentenceCategory.EMOTIONAL
         # "shocking" should be removed, factual content remains
@@ -147,12 +192,15 @@ class TestEmotionalDetector:
         # In flag mode, text should not be modified
         assert "shocking" in result[0].text.lower()
 
-    @pytest.mark.parametrize("text", [
-        "a " * 500 + "shocking event occurred.",
-        "",
-        "   ",
-        "12345 67890",
-    ])
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "a " * 500 + "shocking event occurred.",
+            "",
+            "   ",
+            "12345 67890",
+        ],
+    )
     def test_boundary_inputs(self, detector, text):
         """Test that boundary inputs don't crash the analyzer."""
         sentences = [_make_sentence(text)]

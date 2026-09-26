@@ -295,7 +295,7 @@ class TestArticleAPIRegression:
 
     def test_source_type_values(self) -> None:
         """SourceType has expected values."""
-        expected_types = ["URL", "RSS", "TEXT", "API"]
+        expected_types = ["URL", "RSS", "TEXT", "NEWSAPI"]
 
         for type_name in expected_types:
             assert hasattr(SourceType, type_name), f"Missing SourceType: {type_name}"
@@ -316,7 +316,7 @@ class TestJSONOutputRegression:
     def test_json_top_level_structure(self, json_output: dict[str, Any]) -> None:
         """JSON has expected top-level structure."""
         # These fields should always be present
-        assert "text" in json_output
+        assert "text" in json_output["extracted"]
         assert "statistics" in json_output
 
     def test_json_statistics_structure(self, json_output: dict[str, Any]) -> None:
@@ -334,7 +334,7 @@ class TestJSONOutputRegression:
 
     def test_json_types_correct(self, json_output: dict[str, Any]) -> None:
         """JSON field types are correct."""
-        assert isinstance(json_output["text"], str)
+        assert isinstance(json_output["extracted"]["text"], str)
 
         stats = json_output["statistics"]
         assert isinstance(stats["original_words"], (int, float))
@@ -376,14 +376,17 @@ class TestExceptionAPIRegression:
         ]
 
         for exc in exceptions:
-            assert issubclass(exc, NewsDigestError), \
+            assert issubclass(exc, NewsDigestError), (
                 f"{exc.__name__} should inherit from NewsDigestError"
+            )
 
     def test_exception_attributes(self) -> None:
         """Exceptions have expected attributes."""
         from newsdigest.exceptions import NewsDigestError
 
-        exc = NewsDigestError("Test error", cause=ValueError("cause"), details={"key": "value"})
+        exc = NewsDigestError(
+            "Test error", cause=ValueError("cause"), details={"key": "value"}
+        )
 
         assert hasattr(exc, "message")
         assert hasattr(exc, "cause")

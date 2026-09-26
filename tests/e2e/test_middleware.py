@@ -3,6 +3,7 @@
 Tests authentication, rate limiting, and request tracking.
 """
 
+import contextlib
 import time
 
 import pytest
@@ -322,7 +323,7 @@ class TestAuthMiddleware:
         app = create_app(enable_auth=True, enable_rate_limit=False)
 
         # Replace the global manager with our test instance
-        from newsdigest.api import middleware  # noqa: PLC0415
+        from newsdigest.api import middleware
 
         original_manager = middleware.api_key_manager
         middleware.api_key_manager = manager
@@ -432,7 +433,7 @@ class TestRateLimitMiddleware:
 
     def test_rate_limit_exceeded_returns_429(self):
         """Test that exceeding rate limit returns 429."""
-        from newsdigest.api import middleware  # noqa: PLC0415
+        from newsdigest.api import middleware
 
         # Create limiter with very low limits
         original_limiter = middleware.rate_limiter
@@ -444,13 +445,11 @@ class TestRateLimitMiddleware:
 
             # First request should succeed (uses up the limit)
             # Use health endpoint which doesn't require full extraction
-            try:
+            with contextlib.suppress(Exception):  # May fail but that's OK
                 client.post(
                     "/api/v1/extract",
                     json={"source": "Test content."},
                 )
-            except Exception:
-                pass  # May fail but that's OK
 
             # Second request should be rate limited
             try:
@@ -466,7 +465,7 @@ class TestRateLimitMiddleware:
 
     def test_rate_limit_error_response_format(self):
         """Test rate limit error response format."""
-        from newsdigest.api import middleware  # noqa: PLC0415
+        from newsdigest.api import middleware
 
         original_limiter = middleware.rate_limiter
         middleware.rate_limiter = RateLimiter(requests_per_minute=1, burst_size=1)
@@ -476,10 +475,8 @@ class TestRateLimitMiddleware:
             client = TestClient(app)
 
             # Use up the limit
-            try:
+            with contextlib.suppress(Exception):  # May fail but that's OK
                 client.post("/api/v1/extract", json={"source": "Test."})
-            except Exception:
-                pass  # May fail but that's OK
 
             # Get rate limited
             try:
@@ -499,7 +496,7 @@ class TestMiddlewareIntegration:
 
     def test_auth_then_rate_limit(self):
         """Test auth is checked before rate limiting."""
-        from newsdigest.api import middleware  # noqa: PLC0415
+        from newsdigest.api import middleware
 
         manager = APIKeyManager()
         original_manager = middleware.api_key_manager
@@ -518,7 +515,7 @@ class TestMiddlewareIntegration:
 
     def test_request_tracking_records_all_requests(self):
         """Test request tracking records successful and failed requests."""
-        from newsdigest.api import middleware  # noqa: PLC0415
+        from newsdigest.api import middleware
 
         original_tracker = middleware.request_tracker
         middleware.request_tracker = RequestTracker()
@@ -529,10 +526,8 @@ class TestMiddlewareIntegration:
 
             # Make some requests
             client.get("/api/v1/health")
-            try:
+            with contextlib.suppress(Exception):  # May fail but that's OK
                 client.post("/api/v1/extract", json={"source": "Test."})
-            except Exception:
-                pass  # May fail but that's OK
             client.get("/api/v1/nonexistent")  # 404
 
             stats = middleware.request_tracker.get_stats()

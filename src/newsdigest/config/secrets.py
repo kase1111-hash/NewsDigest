@@ -11,7 +11,7 @@ import os
 import re
 from collections.abc import Callable
 from pathlib import Path
-from typing import TypeVar
+from typing import Any, TypeVar
 
 from newsdigest.utils.logging import get_logger
 
@@ -138,6 +138,7 @@ class EnvLoader:
             # Try using python-dotenv if available
             try:
                 from dotenv import load_dotenv
+
                 load_dotenv(path, override=False)
                 self._loaded_from_file = True
                 logger.debug(f"Loaded environment from {path} using python-dotenv")
@@ -159,9 +160,9 @@ class EnvLoader:
         Args:
             path: Path to .env file.
         """
-        with open(path, encoding="utf-8") as f:
-            for line_num, line in enumerate(f, 1):
-                line = line.strip()
+        with path.open(encoding="utf-8") as f:
+            for line_num, raw_line in enumerate(f, 1):
+                line = raw_line.strip()
 
                 # Skip empty lines and comments
                 if not line or line.startswith("#"):
@@ -176,14 +177,12 @@ class EnvLoader:
                 key = key.strip()
                 value = value.strip()
 
-                # Remove surrounding quotes
-                if (value.startswith('"') and value.endswith('"')) or \
-                   (value.startswith("'") and value.endswith("'")):
+                # Remove surrounding quotes; only double-quoted values
+                # interpret escape sequences (as with python-dotenv)
+                if len(value) >= 2 and value[0] == value[-1] == '"':
+                    value = value[1:-1].encode().decode("unicode_escape")
+                elif len(value) >= 2 and value[0] == value[-1] == "'":
                     value = value[1:-1]
-
-                # Handle escape sequences in double-quoted values
-                if value.startswith('"'):
-                    value = value.encode().decode("unicode_escape")
 
                 # Only set if not already in environment (don't override)
                 if key not in os.environ:
@@ -227,7 +226,7 @@ class EnvLoader:
                 return cast(value)
             except (ValueError, TypeError) as e:
                 if required:
-                    raise ValueError(f"Failed to cast {full_key}: {e}")
+                    raise ValueError(f"Failed to cast {full_key}: {e}") from e
                 return default
 
         return value
@@ -352,7 +351,7 @@ class SecretsManager:
         Args:
             cache_ttl: Cache time-to-live in seconds.
         """
-        self._cache: dict[str, tuple] = {}  # key -> (value, timestamp)
+        self._cache: dict[str, tuple[str, float]] = {}  # key -> (value, timestamp)
         self._cache_ttl = cache_ttl
 
     def get_secret(self, key: str, required: bool = False) -> SecretValue:
@@ -369,20 +368,27 @@ class SecretsManager:
 
         # Check cache
         if key in self._cache:
-            value, timestamp = self._cache[key]
+            cached_value, timestamp = self._cache[key]
             if time.time() - timestamp < self._cache_ttl:
-                return SecretValue(value)
+                return SecretValue(cached_value)
 
         # Fetch from backend
         try:
             value = self._fetch_secret(key)
-            self._cache[key] = (value, time.time())
-            return SecretValue(value)
         except Exception as e:
             logger.error(f"Failed to fetch secret {key}: {e}")
             if required:
-                raise ValueError(f"Required secret {key} not found: {e}")
+                raise ValueError(f"Required secret {key} not found: {e}") from e
             return SecretValue(None)
+
+        if value is None:
+            # Not cached, so a secret added later is picked up on next lookup
+            if required:
+                raise ValueError(f"Required secret {key} not found")
+            return SecretValue(None)
+
+        self._cache[key] = (value, time.time())
+        return SecretValue(value)
 
     def _fetch_secret(self, key: str) -> str | None:
         """Fetch secret from backend.
@@ -422,19 +428,21 @@ class AWSSecretsManager(SecretsManager):
         """
         super().__init__(cache_ttl)
         self._region = region_name or os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
-        self._client = None
+        # boto3 ships without type hints, so the client is untyped
+        self._client: Any = None
 
-    def _get_client(self):
+    def _get_client(self) -> Any:
         """Get or create boto3 client."""
         if self._client is None:
             try:
                 import boto3
+
                 self._client = boto3.client(
                     "secretsmanager",
                     region_name=self._region,
                 )
-            except ImportError:
-                raise ImportError("boto3 is required for AWS Secrets Manager")
+            except ImportError as e:
+                raise ImportError("boto3 is required for AWS Secrets Manager") from e
         return self._client
 
     def _fetch_secret(self, key: str) -> str | None:
@@ -451,9 +459,11 @@ class AWSSecretsManager(SecretsManager):
             response = client.get_secret_value(SecretId=key)
 
             if "SecretString" in response:
-                return response["SecretString"]
+                secret_string: str = response["SecretString"]
+                return secret_string
             else:
                 import base64
+
                 return base64.b64decode(response["SecretBinary"]).decode("utf-8")
 
         except Exception as e:
@@ -473,13 +483,17 @@ class SecretMasker:
     def __init__(self) -> None:
         """Initialize secret masker."""
         self._secrets: list[str] = []
-        self._patterns: list[re.Pattern] = []
+        self._patterns: list[re.Pattern[str]] = []
 
         # Common secret patterns
-        self._add_pattern(r"(?i)(api[_-]?key|apikey)['\"]?\s*[:=]\s*['\"]?([a-zA-Z0-9_\-]{16,})")
-        self._add_pattern(r"(?i)(secret|token|password|passwd|pwd)['\"]?\s*[:=]\s*['\"]?([^\s'\"]{8,})")
+        self._add_pattern(
+            r"(?i)(api[_-]?key|apikey)['\"]?\s*[:=]\s*['\"]?([a-zA-Z0-9_\-]{16,})"
+        )
+        self._add_pattern(
+            r"(?i)(secret|token|password|passwd|pwd)['\"]?\s*[:=]\s*['\"]?([^\s'\"]{8,})"
+        )
         self._add_pattern(r"(?i)(bearer\s+)([a-zA-Z0-9_\-\.]+)")
-        self._add_pattern(r"(sk-[a-zA-Z0-9]{20,})")  # OpenAI API keys
+        self._add_pattern(r"(sk-[a-zA-Z0-9_\-]{20,})")  # OpenAI keys (incl. sk-proj-)
         self._add_pattern(r"(ghp_[a-zA-Z0-9]{36,})")  # GitHub tokens
         self._add_pattern(r"(xox[baprs]-[a-zA-Z0-9\-]+)")  # Slack tokens
 
@@ -511,15 +525,13 @@ class SecretMasker:
         for secret in self._secrets:
             if secret in result:
                 # Keep first 2 and last 2 characters for identification
-                if len(secret) > 8:
-                    masked = f"{secret[:2]}****{secret[-2:]}"
-                else:
-                    masked = "****"
+                masked = f"{secret[:2]}****{secret[-2:]}" if len(secret) > 8 else "****"
                 result = result.replace(secret, masked)
 
         # Mask pattern-matched secrets
         for pattern in self._patterns:
-            def replacer(match):
+
+            def replacer(match: re.Match[str]) -> str:
                 groups = match.groups()
                 if len(groups) >= 2:
                     # Keep prefix, mask the secret part

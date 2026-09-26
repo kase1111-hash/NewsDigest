@@ -157,9 +157,7 @@ class TestExtractionPipeline:
         categories = {s.category for s in result.sentences}
         assert len(categories) > 1  # More than one category
 
-    def test_removes_filler_content(
-        self, extractor: Extractor, news_article_text: str
-    ):
+    def test_removes_filler_content(self, extractor: Extractor, news_article_text: str):
         """Test that filler content is removed."""
         result = extractor.extract_text(news_article_text)
 
@@ -200,7 +198,7 @@ class TestFormatters:
     @pytest.fixture
     def extraction_result(self) -> ExtractionResult:
         """Create a sample extraction result."""
-        from newsdigest.core.result import (  # noqa: PLC0415
+        from newsdigest.core.result import (
             Claim,
             ClaimType,
             ExtractionStatistics,
@@ -241,19 +239,19 @@ class TestFormatters:
     def test_json_formatter(self, extraction_result: ExtractionResult):
         """Test JSON formatter produces valid output."""
         formatter = JSONFormatter()
-        output = formatter.format(extraction_result)
+        output = formatter.format_result(extraction_result)
 
         assert isinstance(output, str)
         assert len(output) > 0
 
         # Should be valid JSON
         data = json.loads(output)
-        assert "text" in data or "content" in data or "result" in data
+        assert data["extracted"]["text"] == extraction_result.text
 
     def test_markdown_formatter(self, extraction_result: ExtractionResult):
         """Test Markdown formatter produces valid output."""
         formatter = MarkdownFormatter()
-        output = formatter.format(extraction_result)
+        output = formatter.format_result(extraction_result)
 
         assert isinstance(output, str)
         assert len(output) > 0
@@ -264,7 +262,7 @@ class TestFormatters:
     def test_text_formatter(self, extraction_result: ExtractionResult):
         """Test text formatter produces valid output."""
         formatter = TextFormatter()
-        output = formatter.format(extraction_result)
+        output = formatter.format_result(extraction_result)
 
         assert isinstance(output, str)
         assert len(output) > 0

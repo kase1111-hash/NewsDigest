@@ -6,8 +6,9 @@ from newsdigest.analyzers.filler import FillerDetector
 from newsdigest.core.result import RemovalReason, Sentence, SentenceCategory
 
 
-def _make_sentence(text: str, index: int = 0, entities: list | None = None,
-                   density_score: float = 0.5) -> Sentence:
+def _make_sentence(
+    text: str, index: int = 0, entities: list | None = None, density_score: float = 0.5
+) -> Sentence:
     """Helper to create a Sentence with minimal required fields."""
     return Sentence(
         text=text,
@@ -34,18 +35,21 @@ class TestFillerDetector:
         assert hasattr(detector, "analyze")
         assert detector.enabled is True
 
-    @pytest.mark.parametrize("text", [
-        "Here's what you need to know about this story.",
-        "What happened next will surprise you.",
-        "Stay tuned for more updates on this developing story.",
-        "But that's not the whole story here.",
-        "You won't believe what happened at the summit.",
-        "Everything you need to know about the vote.",
-        "Here's why that matters for the economy.",
-        "Read on to find out the real story.",
-        "Don't miss this critical update on the situation.",
-        "This is a breaking development in the case.",
-    ])
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "Here's what you need to know about this story.",
+            "What happened next will surprise you.",
+            "Stay tuned for more updates on this developing story.",
+            "But that's not the whole story here.",
+            "You won't believe what happened at the summit.",
+            "Everything you need to know about the vote.",
+            "Here's why that matters for the economy.",
+            "Read on to find out the real story.",
+            "Don't miss this critical update on the situation.",
+            "This is a breaking development in the case.",
+        ],
+    )
     def test_engagement_hooks_detected(self, detector, text):
         """Test that engagement hook patterns are flagged as filler."""
         sentences = [_make_sentence(text)]
@@ -53,16 +57,27 @@ class TestFillerDetector:
         assert result[0].keep is False
         assert result[0].removal_reason == RemovalReason.ENGAGEMENT_HOOK.value
 
-    @pytest.mark.parametrize("text,entities", [
-        ("The Federal Reserve raised interest rates by 0.25%.",
-         [{"text": "Federal Reserve", "label": "ORG"}]),
-        ("Revenue increased 15% year over year to $10 billion.",
-         [{"text": "$10 billion", "label": "MONEY"}]),
-        ('"The economy is strong," said Chair Powell.',
-         [{"text": "Powell", "label": "PERSON"}]),
-        ("Apple Inc. reported earnings of $3.89 per share.",
-         [{"text": "Apple Inc.", "label": "ORG"}]),
-    ])
+    @pytest.mark.parametrize(
+        "text,entities",
+        [
+            (
+                "The Federal Reserve raised interest rates by 0.25%.",
+                [{"text": "Federal Reserve", "label": "ORG"}],
+            ),
+            (
+                "Revenue increased 15% year over year to $10 billion.",
+                [{"text": "$10 billion", "label": "MONEY"}],
+            ),
+            (
+                '"The economy is strong," said Chair Powell.',
+                [{"text": "Powell", "label": "PERSON"}],
+            ),
+            (
+                "Apple Inc. reported earnings of $3.89 per share.",
+                [{"text": "Apple Inc.", "label": "ORG"}],
+            ),
+        ],
+    )
     def test_factual_sentences_kept(self, detector, text, entities):
         """Test that factual sentences with entities are not flagged."""
         sentences = [_make_sentence(text, entities=entities)]
@@ -88,14 +103,15 @@ class TestFillerDetector:
         sentences = [
             _make_sentence("Here's what you need to know.", index=0),
             _make_sentence(
-                "The Federal Reserve held rates at 5.25%.", index=1,
+                "The Federal Reserve held rates at 5.25%.",
+                index=1,
                 entities=[{"text": "Federal Reserve", "label": "ORG"}],
             ),
             _make_sentence("Stay tuned for more updates.", index=2),
         ]
         result = detector.analyze(sentences)
         assert result[0].keep is False  # filler
-        assert result[1].keep is True   # factual
+        assert result[1].keep is True  # factual
         assert result[2].keep is False  # filler
 
     def test_short_sentence_without_entities_removed(self, detector):
@@ -114,8 +130,9 @@ class TestFillerDetector:
         """Test counting engagement hooks across multiple sentences."""
         sentences = [
             _make_sentence("Here's what you need to know.", index=0),
-            _make_sentence("The GDP grew 3%.", index=1,
-                           entities=[{"text": "GDP", "label": "ORG"}]),
+            _make_sentence(
+                "The GDP grew 3%.", index=1, entities=[{"text": "GDP", "label": "ORG"}]
+            ),
             _make_sentence("Stay tuned for more.", index=2),
         ]
         count = detector.get_engagement_hook_count(sentences)

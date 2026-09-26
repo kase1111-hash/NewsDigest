@@ -1,6 +1,9 @@
 """Tests for configuration settings."""
 
+import os
 from pathlib import Path
+
+import pytest
 
 from newsdigest.config.settings import (
     Config,
@@ -216,3 +219,81 @@ class TestConfigToEnvVars:
 
         assert "ND_MODE" in env_vars
         assert "NEWSDIGEST_MODE" not in env_vars
+
+
+class TestConfigLoad:
+    """Tests for Config.load() (config file plus environment overrides)."""
+
+    @pytest.fixture(autouse=True)
+    def _clean_env(self, monkeypatch, tmp_path):
+        """Isolate from the real home directory and NEWSDIGEST_* variables."""
+        monkeypatch.setenv("HOME", str(tmp_path))
+        for name in list(os.environ):
+            if name.startswith("NEWSDIGEST_"):
+                monkeypatch.delenv(name)
+
+    def _write(self, path: Path, text: str) -> Path:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+        return path
+
+    def test_defaults_without_file(self):
+        """Test a missing config file means default settings."""
+        assert Config.load() == Config()
+
+    def test_reads_default_location(self, tmp_path):
+        """Test ~/.newsdigest/config.yml is read."""
+        self._write(
+            tmp_path / ".newsdigest" / "config.yml",
+            "extraction:\n  mode: aggressive\nhttp_timeout: 45\n",
+        )
+        config = Config.load()
+        assert config.extraction.mode == "aggressive"
+        assert config.http_timeout == 45
+        # Unspecified nested values keep their defaults
+        assert config.extraction.speculation == "remove"
+
+    def test_env_overrides_file(self, tmp_path, monkeypatch):
+        """Test set environment variables win over the file."""
+        path = self._write(tmp_path / "c.yml", "extraction:\n  mode: aggressive\n")
+        monkeypatch.setenv("NEWSDIGEST_MODE", "conservative")
+        monkeypatch.setenv("NEWSDIGEST_CACHE_TTL", "7200")
+
+        config = Config.load(path)
+        assert config.extraction.mode == "conservative"
+        assert config.cache_ttl == 7200
+
+    def test_config_path_from_env(self, tmp_path, monkeypatch):
+        """Test NEWSDIGEST_CONFIG selects the file."""
+        path = self._write(tmp_path / "custom.yml", "spacy_model: en_core_web_md\n")
+        monkeypatch.setenv("NEWSDIGEST_CONFIG", str(path))
+        assert Config.load().spacy_model == "en_core_web_md"
+
+    def test_unprefixed_variables_ignored(self, monkeypatch):
+        """Test generic names like MODE (set by other tools) are not read."""
+        monkeypatch.setenv("MODE", "production")
+        monkeypatch.setenv("CACHE_TTL", "5")
+        config = Config.load()
+        assert config.extraction.mode == "standard"
+        assert config.cache_ttl == 3600
+
+    def test_cors_origins_from_env(self, monkeypatch):
+        """Test CORS origins can be configured as a comma-separated list."""
+        monkeypatch.setenv("NEWSDIGEST_CORS_ORIGINS", "https://a.com, https://b.com")
+        assert Config.load().cors_origins == ["https://a.com", "https://b.com"]
+
+    def test_save_roundtrip(self, tmp_path):
+        """Test a saved config can be loaded back."""
+        config = Config()
+        config.extraction.mode = "aggressive"
+        path = tmp_path / "saved.yml"
+        config.save(path)
+
+        loaded = Config.from_file(path)
+        assert loaded.extraction.mode == "aggressive"
+        assert loaded.config_dir == config.config_dir
+
+    def test_from_file_expands_home(self, tmp_path):
+        """Test "~" in the path is expanded."""
+        self._write(tmp_path / "cfg.yml", "http_retries: 7\n")
+        assert Config.from_file("~/cfg.yml").http_retries == 7

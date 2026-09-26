@@ -1,8 +1,11 @@
 """RSS feed parser for NewsDigest."""
 
 import asyncio
+import calendar
 import hashlib
-from datetime import datetime
+import io
+from datetime import UTC, datetime
+from typing import Any
 from urllib.parse import urlparse
 
 import feedparser
@@ -10,6 +13,10 @@ import feedparser
 from newsdigest.core.article import Article, SourceType
 from newsdigest.ingestors.base import BaseIngestor
 from newsdigest.ingestors.url import URLFetcher
+from newsdigest.utils.logging import get_logger
+
+
+logger = get_logger(__name__)
 
 
 class RSSParser(BaseIngestor):
@@ -19,7 +26,7 @@ class RSSParser(BaseIngestor):
     Can optionally fetch full article content from links.
     """
 
-    def __init__(self, config: dict | None = None) -> None:
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize RSS parser.
 
         Args:
@@ -28,7 +35,24 @@ class RSSParser(BaseIngestor):
         super().__init__(config)
         self.fetch_full_content = self.config.get("fetch_full_content", True)
         self.max_items = self.config.get("max_items", 50)
-        self._url_fetcher = URLFetcher(config) if self.fetch_full_content else None
+        # Feeds are downloaded through URLFetcher so they get the same URL
+        # validation (no private/internal hosts), timeouts and retries
+        self._url_fetcher = URLFetcher(config)
+
+    async def _fetch_feed(self, feed_url: str) -> feedparser.FeedParserDict:
+        """Download and parse a feed.
+
+        Args:
+            feed_url: URL of the RSS/Atom feed.
+
+        Returns:
+            Parsed feed.
+        """
+        content = await self._url_fetcher.fetch_bytes(feed_url)
+        # Pass a stream: given a string, feedparser treats URLs and file
+        # paths as locations to fetch/open rather than as feed content
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, feedparser.parse, io.BytesIO(content))
 
     async def ingest(self, source: str) -> Article:
         """Parse RSS feed and return first article.
@@ -81,9 +105,7 @@ class RSSParser(BaseIngestor):
         Returns:
             List of Article objects.
         """
-        # feedparser is synchronous, run in executor
-        loop = asyncio.get_event_loop()
-        feed = await loop.run_in_executor(None, feedparser.parse, feed_url)
+        feed = await self._fetch_feed(feed_url)
 
         if feed.bozo and not feed.entries:
             # Feed has error and no entries
@@ -91,7 +113,6 @@ class RSSParser(BaseIngestor):
 
         # Get feed metadata
         feed_title = feed.feed.get("title", "")
-        feed_link = feed.feed.get("link", "")
 
         # Parse source name from URL
         source_name = feed_title or urlparse(feed_url).netloc.replace("www.", "")
@@ -109,7 +130,7 @@ class RSSParser(BaseIngestor):
 
     async def _parse_entry(
         self,
-        entry: dict,
+        entry: feedparser.FeedParserDict,
         source_name: str,
         feed_url: str,
     ) -> Article | None:
@@ -137,7 +158,7 @@ class RSSParser(BaseIngestor):
             content = entry.get("summary", "")
 
         # If we should fetch full content and have a link
-        if self.fetch_full_content and link and self._url_fetcher:
+        if self.fetch_full_content and link:
             try:
                 full_article = await self._url_fetcher.ingest(link)
                 # Use fetched content if longer
@@ -145,9 +166,9 @@ class RSSParser(BaseIngestor):
                     content = full_article.content
                     if not title:
                         title = full_article.title
-            except Exception:
+            except Exception as e:
                 # Fall back to feed content
-                pass
+                logger.debug(f"Using feed content for {link}: full fetch failed: {e}")
 
         if not content:
             return None
@@ -183,7 +204,7 @@ class RSSParser(BaseIngestor):
         """
         return hashlib.sha256(identifier.encode()).hexdigest()[:16]
 
-    def _parse_date(self, entry: dict) -> datetime | None:
+    def _parse_date(self, entry: feedparser.FeedParserDict) -> datetime | None:
         """Parse published date from entry.
 
         Args:
@@ -192,14 +213,14 @@ class RSSParser(BaseIngestor):
         Returns:
             Datetime object or None.
         """
-        # feedparser provides parsed date as time struct
+        # feedparser provides parsed dates as UTC time structs
         for date_field in ["published_parsed", "updated_parsed", "created_parsed"]:
             if entry.get(date_field):
                 try:
-                    import time
-
-                    return datetime.fromtimestamp(time.mktime(entry[date_field]))
-                except (ValueError, OverflowError):
+                    return datetime.fromtimestamp(
+                        calendar.timegm(entry[date_field]), tz=UTC
+                    )
+                except (ValueError, OverflowError, OSError):
                     continue
 
         return None
@@ -220,13 +241,17 @@ class RSSParser(BaseIngestor):
         """
         all_articles = await self.parse(feed_url)
 
+        # Treat naive datetimes as UTC so they compare with aware ones
+        if since.tzinfo is None:
+            since = since.replace(tzinfo=UTC)
+
         return [
             article
             for article in all_articles
             if article.published_at and article.published_at > since
         ]
 
-    async def get_feed_info(self, feed_url: str) -> dict:
+    async def get_feed_info(self, feed_url: str) -> dict[str, Any]:
         """Get feed metadata without fetching articles.
 
         Args:
@@ -235,8 +260,7 @@ class RSSParser(BaseIngestor):
         Returns:
             Dictionary with feed metadata.
         """
-        loop = asyncio.get_event_loop()
-        feed = await loop.run_in_executor(None, feedparser.parse, feed_url)
+        feed = await self._fetch_feed(feed_url)
 
         return {
             "title": feed.feed.get("title", ""),

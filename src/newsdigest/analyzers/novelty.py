@@ -1,6 +1,7 @@
 """Novelty scorer for NewsDigest."""
 
 from collections import Counter
+from typing import Any
 
 from newsdigest.analyzers.base import BaseAnalyzer
 from newsdigest.core.result import Sentence
@@ -18,7 +19,7 @@ class NoveltyScorer(BaseAnalyzer):
     Lower novelty = sentence repeats earlier content
     """
 
-    def __init__(self, config: dict | None = None) -> None:
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize novelty scorer."""
         super().__init__(config)
         self.min_novelty = self.config.get("min_novelty_score", 0.3)
@@ -41,16 +42,14 @@ class NoveltyScorer(BaseAnalyzer):
 
         # Track seen information
         seen_entities: set[str] = set()
-        seen_terms: Counter = Counter()
+        seen_terms: Counter[str] = Counter()
 
         for i, sentence in enumerate(sentences):
             if not sentence.keep:
                 continue
 
             # Calculate novelty based on new information
-            novelty = self._calculate_novelty(
-                sentence, seen_entities, seen_terms, i
-            )
+            novelty = self._calculate_novelty(sentence, seen_entities, seen_terms, i)
             sentence.novelty_score = novelty
 
             # Update seen information
@@ -62,7 +61,7 @@ class NoveltyScorer(BaseAnalyzer):
         self,
         sentence: Sentence,
         seen_entities: set[str],
-        seen_terms: Counter,
+        seen_terms: Counter[str],
         position: int,
     ) -> float:
         """Calculate novelty score for a sentence.
@@ -102,21 +101,16 @@ class NoveltyScorer(BaseAnalyzer):
 
         # Combine scores
         combined = (
-            entity_novelty * 0.4 +
-            term_novelty * 0.4 +
-            number_bonus +
-            quote_bonus
+            entity_novelty * 0.4 + term_novelty * 0.4 + number_bonus + quote_bonus
         )
 
         # Apply position decay (later sentences get small penalty)
-        position_factor = self.decay_factor ** (position / 10)
+        position_factor: float = self.decay_factor ** (position / 10)
         combined *= position_factor
 
         return round(min(1.0, max(0.0, combined)), 2)
 
-    def _entity_novelty(
-        self, sentence: Sentence, seen_entities: set[str]
-    ) -> float:
+    def _entity_novelty(self, sentence: Sentence, seen_entities: set[str]) -> float:
         """Calculate novelty based on entities.
 
         Args:
@@ -144,7 +138,7 @@ class NoveltyScorer(BaseAnalyzer):
 
         return novelty
 
-    def _term_novelty(self, words: list[str], seen_terms: Counter) -> float:
+    def _term_novelty(self, words: list[str], seen_terms: Counter[str]) -> float:
         """Calculate novelty based on terms.
 
         Args:
@@ -157,7 +151,7 @@ class NoveltyScorer(BaseAnalyzer):
         if not words:
             return 0.5
 
-        new_count = 0
+        new_count: float = 0
         for word in words:
             if seen_terms[word] == 0:
                 new_count += 1
@@ -177,17 +171,101 @@ class NoveltyScorer(BaseAnalyzer):
             List of content terms.
         """
         stop_words = {
-            "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-            "have", "has", "had", "do", "does", "did", "will", "would", "could",
-            "should", "may", "might", "must", "shall", "can", "to", "of", "in",
-            "for", "on", "with", "at", "by", "from", "as", "into", "through",
-            "during", "before", "after", "above", "below", "between", "under",
-            "again", "further", "then", "once", "and", "but", "or", "nor", "so",
-            "yet", "both", "either", "neither", "not", "only", "own", "same",
-            "than", "too", "very", "just", "also", "that", "this", "these",
-            "those", "it", "its", "they", "their", "them", "he", "she", "his",
-            "her", "him", "we", "our", "us", "you", "your", "who", "which",
-            "what", "when", "where", "why", "how", "said", "says", "told",
+            "the",
+            "a",
+            "an",
+            "is",
+            "are",
+            "was",
+            "were",
+            "be",
+            "been",
+            "being",
+            "have",
+            "has",
+            "had",
+            "do",
+            "does",
+            "did",
+            "will",
+            "would",
+            "could",
+            "should",
+            "may",
+            "might",
+            "must",
+            "shall",
+            "can",
+            "to",
+            "of",
+            "in",
+            "for",
+            "on",
+            "with",
+            "at",
+            "by",
+            "from",
+            "as",
+            "into",
+            "through",
+            "during",
+            "before",
+            "after",
+            "above",
+            "below",
+            "between",
+            "under",
+            "again",
+            "further",
+            "then",
+            "once",
+            "and",
+            "but",
+            "or",
+            "nor",
+            "so",
+            "yet",
+            "both",
+            "either",
+            "neither",
+            "not",
+            "only",
+            "own",
+            "same",
+            "than",
+            "too",
+            "very",
+            "just",
+            "also",
+            "that",
+            "this",
+            "these",
+            "those",
+            "it",
+            "its",
+            "they",
+            "their",
+            "them",
+            "he",
+            "she",
+            "his",
+            "her",
+            "him",
+            "we",
+            "our",
+            "us",
+            "you",
+            "your",
+            "who",
+            "which",
+            "what",
+            "when",
+            "where",
+            "why",
+            "how",
+            "said",
+            "says",
+            "told",
         }
 
         words = text.lower().split()
@@ -203,7 +281,7 @@ class NoveltyScorer(BaseAnalyzer):
         self,
         sentence: Sentence,
         seen_entities: set[str],
-        seen_terms: Counter,
+        seen_terms: Counter[str],
     ) -> None:
         """Update seen information with sentence content.
 

@@ -80,15 +80,15 @@ def digest(
     """
     try:
         # Initialize generator
-        config = Config()
+        config = Config.load()
         generator = DigestGenerator(config=config)
 
         # Load sources from config file if provided
         if config_file:
             import yaml
 
-            with open(config_file, encoding="utf-8") as f:
-                sources_config = yaml.safe_load(f)
+            with Path(config_file).open(encoding="utf-8") as f:
+                sources_config = yaml.safe_load(f) or {}
 
             for source in sources_config.get("sources", []):
                 if source.get("type") == "rss":
@@ -129,7 +129,7 @@ def digest(
             if not quiet:
                 console.print(f"[green]Digest written to: {output}[/green]")
         else:
-            console.print(result)
+            click.echo(result)
 
     except DigestError as e:
         console.print(f"[red]Digest generation failed:[/red] {e}")

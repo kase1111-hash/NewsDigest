@@ -34,7 +34,7 @@ class NewsDigestError(Exception):
         message: str,
         *args: Any,
         cause: Exception | None = None,
-        details: dict | None = None,
+        details: dict[str, Any] | None = None,
     ) -> None:
         """Initialize exception.
 
@@ -56,7 +56,7 @@ class NewsDigestError(Exception):
             result += f" (caused by: {self.cause})"
         return result
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert exception to dictionary for JSON serialization.
 
         Returns:
@@ -387,7 +387,7 @@ class DeduplicationError(DigestError):
 
 def wrap_exception(
     exc: Exception,
-    wrapper_class: type,
+    wrapper_class: type[NewsDigestError],
     message: str | None = None,
 ) -> NewsDigestError:
     """Wrap an exception in a NewsDigest exception.
@@ -424,6 +424,7 @@ def is_retryable(exc: Exception) -> bool:
     # Network errors from httpx are retryable
     try:
         import httpx
+
         if isinstance(exc, (httpx.TimeoutException, httpx.ConnectError)):
             return True
     except ImportError:

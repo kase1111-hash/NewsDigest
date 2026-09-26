@@ -249,10 +249,7 @@ class TestCompareEndpoint:
 
     def test_compare_returns_diff(self, client: TestClient):
         """Test compare returns diff."""
-        text = (
-            "In a shocking announcement, the company grew. "
-            "Revenue was $100 million."
-        )
+        text = "In a shocking announcement, the company grew. Revenue was $100 million."
 
         response = client.post(
             "/api/v1/compare",
@@ -353,3 +350,85 @@ class TestAPIDocumentation:
         """Test ReDoc is available."""
         response = client.get("/redoc")
         assert response.status_code == 200
+
+
+class TestExtractionOptions:
+    """Tests that request options and app config reach the extractor."""
+
+    @pytest.fixture
+    def client(self) -> TestClient:
+        """Create a test client (running the app lifespan)."""
+        app = create_app(enable_auth=False, enable_rate_limit=False)
+        with TestClient(app) as client:
+            yield client
+
+    def _content(self, client: TestClient, path: str, mode: str) -> str:
+        response = client.post(
+            path,
+            json={
+                "source": "The dangerous storm hit the Florida coast on Monday, "
+                "officials said.",
+                "mode": mode,
+            },
+        )
+        assert response.status_code == 200
+        data = response.json()
+        return data["result"]["content"] if "result" in data else data["compressed"]
+
+    @pytest.mark.parametrize("path", ["/api/v1/extract", "/api/v1/compare"])
+    def test_mode_is_honored(self, client: TestClient, path: str):
+        """Test the request's mode changes the extraction."""
+        assert "dangerous" in self._content(client, path, "standard")
+        assert "dangerous" not in self._content(client, path, "aggressive")
+
+    def test_batch_mode_is_honored(self, client: TestClient):
+        """Test batch extraction uses the request's mode."""
+        response = client.post(
+            "/api/v1/extract/batch",
+            json={
+                "sources": [
+                    "The dangerous storm hit Florida on Monday, officials said."
+                ],
+                "mode": "aggressive",
+            },
+        )
+        item = response.json()["results"][0]
+        assert item["success"] is True
+        assert "dangerous" not in item["result"]["content"]
+
+    def test_internal_url_rejected_with_source(self, client: TestClient):
+        """Test SSRF targets are refused and the error names the source."""
+        url = "http://169.254.169.254/latest/meta-data/"
+        response = client.post("/api/v1/extract", json={"source": url})
+
+        assert response.status_code == 422
+        data = response.json()
+        assert data["error"] == "ingest_error"
+        assert data["details"]["source"] == url
+
+    def test_empty_compare_source_rejected(self, client: TestClient):
+        """Test compare validates its input like extract does."""
+        response = client.post("/api/v1/compare", json={"source": ""})
+        assert response.status_code == 422
+
+
+class TestAppConfig:
+    """Tests for application configuration handling."""
+
+    def test_passed_config_survives_startup(self):
+        """Test the lifespan handler doesn't replace a config given to create_app."""
+        from newsdigest.config.settings import Config
+
+        config = Config(cache_ttl=123)
+        app = create_app(config=config, enable_rate_limit=False)
+        with TestClient(app):
+            assert app.state.config is config
+            assert app.state.cache._default_ttl == 123
+
+    def test_cache_disabled(self):
+        """Test cache_enabled=False creates no cache."""
+        from newsdigest.config.settings import Config
+
+        app = create_app(config=Config(cache_enabled=False), enable_rate_limit=False)
+        with TestClient(app):
+            assert app.state.cache is None

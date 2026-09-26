@@ -4,8 +4,9 @@ Sends digests and allows interaction via Slack.
 Uses the Slack Web API directly (no external dependencies).
 """
 
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
-from typing import Any, Callable, Coroutine
+from typing import Any
 
 import httpx
 
@@ -253,7 +254,8 @@ class SlackBot:
         )
 
         result = response.json()
-        return result.get("ok", False)
+        ok: bool = result.get("ok", False)
+        return ok
 
     async def add_reaction(
         self,
@@ -281,7 +283,8 @@ class SlackBot:
         )
 
         result = response.json()
-        return result.get("ok", False)
+        ok: bool = result.get("ok", False)
+        return ok
 
     async def get_channel_history(
         self,
@@ -309,18 +312,17 @@ class SlackBot:
         if not result.get("ok"):
             return []
 
-        messages = []
-        for msg in result.get("messages", []):
-            messages.append(
-                SlackMessage(
-                    ts=msg.get("ts", ""),
-                    channel=channel,
-                    text=msg.get("text", ""),
-                    user=msg.get("user"),
-                    thread_ts=msg.get("thread_ts"),
-                    blocks=msg.get("blocks", []),
-                )
+        messages = [
+            SlackMessage(
+                ts=msg.get("ts", ""),
+                channel=channel,
+                text=msg.get("text", ""),
+                user=msg.get("user"),
+                thread_ts=msg.get("thread_ts"),
+                blocks=msg.get("blocks", []),
             )
+            for msg in result.get("messages", [])
+        ]
 
         return messages
 
@@ -365,16 +367,15 @@ class SlackBot:
         if not result.get("ok"):
             return []
 
-        channels = []
-        for ch in result.get("channels", []):
-            channels.append(
-                SlackChannel(
-                    id=ch.get("id", ""),
-                    name=ch.get("name", ""),
-                    is_private=ch.get("is_private", False),
-                    is_im=ch.get("is_im", False),
-                )
+        channels = [
+            SlackChannel(
+                id=ch.get("id", ""),
+                name=ch.get("name", ""),
+                is_private=ch.get("is_private", False),
+                is_im=ch.get("is_im", False),
             )
+            for ch in result.get("channels", [])
+        ]
 
         return channels
 
@@ -395,51 +396,59 @@ class SlackBot:
         blocks: list[dict[str, Any]] = []
 
         if title:
-            blocks.append({
-                "type": "header",
-                "text": {
-                    "type": "plain_text",
-                    "text": title,
-                    "emoji": True,
-                },
-            })
+            blocks.append(
+                {
+                    "type": "header",
+                    "text": {
+                        "type": "plain_text",
+                        "text": title,
+                        "emoji": True,
+                    },
+                }
+            )
 
         # Parse markdown content into sections
         current_section = ""
-        for line in content.split("\n"):
-            line = line.strip()
+        for raw_line in content.split("\n"):
+            line = raw_line.strip()
 
             if line.startswith("## "):
                 # New section header
                 if current_section:
-                    blocks.append({
-                        "type": "section",
-                        "text": {
-                            "type": "mrkdwn",
-                            "text": current_section[:3000],
-                        },
-                    })
+                    blocks.append(
+                        {
+                            "type": "section",
+                            "text": {
+                                "type": "mrkdwn",
+                                "text": current_section[:3000],
+                            },
+                        }
+                    )
                     current_section = ""
 
                 blocks.append({"type": "divider"})
-                blocks.append({
-                    "type": "header",
-                    "text": {
-                        "type": "plain_text",
-                        "text": line[3:],
-                        "emoji": True,
-                    },
-                })
+                blocks.append(
+                    {
+                        "type": "header",
+                        "text": {
+                            "type": "plain_text",
+                            "text": line[3:],
+                            "emoji": True,
+                        },
+                    }
+                )
 
             elif line.startswith("### "):
                 if current_section:
-                    blocks.append({
-                        "type": "section",
-                        "text": {
-                            "type": "mrkdwn",
-                            "text": current_section[:3000],
-                        },
-                    })
+                    blocks.append(
+                        {
+                            "type": "section",
+                            "text": {
+                                "type": "mrkdwn",
+                                "text": current_section[:3000],
+                            },
+                        }
+                    )
                     current_section = ""
 
                 current_section = f"*{line[4:]}*\n"
@@ -449,13 +458,15 @@ class SlackBot:
 
         # Add remaining content
         if current_section:
-            blocks.append({
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": current_section[:3000],
-                },
-            })
+            blocks.append(
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": current_section[:3000],
+                    },
+                }
+            )
 
         return blocks
 
@@ -576,4 +587,4 @@ def create_newsdigest_slack_bot(
         default_channel=default_channel,
     )
 
-    return SlackBot(config=config)
+    return SlackBot(bot_token, config=config)

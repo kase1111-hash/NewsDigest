@@ -1,6 +1,7 @@
 """Filler content detector for NewsDigest."""
 
 import re
+from typing import Any
 
 from newsdigest.analyzers.base import BaseAnalyzer
 from newsdigest.core.result import RemovalReason, Sentence, SentenceCategory
@@ -11,6 +12,7 @@ ENGAGEMENT_HOOKS: list[str] = [
     r"here'?s what you need to know",
     r"what happened next will surprise you",
     r"but that'?s not the whole story",
+    r"^but that'?s not all\b",
     r"stay tuned for more",
     r"we'?ll keep you posted",
     r"you won'?t believe",
@@ -66,7 +68,7 @@ class FillerDetector(BaseAnalyzer):
     - Very short sentences with no substantive content
     """
 
-    def __init__(self, config: dict | None = None) -> None:
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize filler detector."""
         super().__init__(config)
         self._engagement_patterns = [
@@ -113,7 +115,8 @@ class FillerDetector(BaseAnalyzer):
             Tuple of (is_filler, reason).
         """
         text = sentence.text.strip()
-        text_lower = text.lower()
+        # Patterns use straight apostrophes; web text often has curly ones
+        text_lower = text.lower().replace("\u2019", "'")
 
         # Check engagement hooks
         for pattern in self._engagement_patterns:
@@ -128,10 +131,12 @@ class FillerDetector(BaseAnalyzer):
         # Check for very short sentences with no entities
         words = text.split()
         # Allow short sentences with entities or quotes
-        if (len(words) < self.min_word_count
-                and not sentence.entities
-                and '"' not in text
-                and "'" not in text):
+        if (
+            len(words) < self.min_word_count
+            and not sentence.entities
+            and '"' not in text
+            and "'" not in text
+        ):
             return True, RemovalReason.LOW_DENSITY.value
 
         # Check entity density for longer sentences
@@ -158,7 +163,7 @@ class FillerDetector(BaseAnalyzer):
         """
         count = 0
         for sentence in sentences:
-            text_lower = sentence.text.lower()
+            text_lower = sentence.text.lower().replace("\u2019", "'")
             for pattern in self._engagement_patterns:
                 if pattern.search(text_lower):
                     count += 1

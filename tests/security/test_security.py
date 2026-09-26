@@ -44,7 +44,7 @@ class TestURLValidationSecurity:
         ]
 
         for url in dangerous_urls:
-            is_valid, error = validate_url(url)
+            is_valid, _error = validate_url(url)
             assert is_valid is False, f"Should block: {url}"
 
     def test_blocks_data_urls(self) -> None:
@@ -55,7 +55,7 @@ class TestURLValidationSecurity:
         ]
 
         for url in dangerous_urls:
-            is_valid, error = validate_url(url)
+            is_valid, _error = validate_url(url)
             assert is_valid is False, f"Should block: {url}"
 
     def test_blocks_file_urls(self) -> None:
@@ -66,7 +66,7 @@ class TestURLValidationSecurity:
         ]
 
         for url in dangerous_urls:
-            is_valid, error = validate_url(url)
+            is_valid, _error = validate_url(url)
             assert is_valid is False, f"Should block: {url}"
 
     def test_blocks_private_networks_by_default(self) -> None:
@@ -78,17 +78,47 @@ class TestURLValidationSecurity:
             "http://10.0.0.1/internal",
             "http://172.16.0.1/data",
             "http://[::1]/admin",
+            # Cloud metadata endpoint (link-local)
+            "http://169.254.169.254/latest/meta-data/",
+            # Alternative encodings of 127.0.0.1
+            "http://2130706433/",
+            "http://0x7f.0.0.1/",
+            "http://127.1/",
+            "http://[::ffff:127.0.0.1]/",
+            "http://[::7f00:1]/",
+            "http://[64:ff9b::7f00:1]/",
+            "http://[2002:7f00:1::]/",
+            # Other non-public ranges and names
+            "http://0.0.0.0/",
+            "http://100.64.0.1/",
+            "http://[fd00::1]/",
+            "http://[fe80::1]/",
+            "http://service.internal/",
+            "http://LOCALHOST./",
         ]
 
         for url in private_urls:
-            is_valid, error = validate_url(url, allow_private=False)
+            is_valid, _error = validate_url(url, allow_private=False)
             assert is_valid is False, f"Should block private: {url}"
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://example.com/news",
+            "https://8.8.8.8/",
+            "https://1e100.net/",
+            "http://[2606:4700::1111]/",
+        ],
+    )
+    def test_allows_public_hosts(self, url: str) -> None:
+        """Public hosts and IPs are allowed."""
+        assert validate_url(url) == (True, None)
 
     def test_blocks_url_with_credentials(self) -> None:
         """URLs with embedded credentials should be handled carefully."""
         url = "http://user:password@example.com/path"
         # Should either block or strip credentials
-        is_valid, error = validate_url(url)
+        _is_valid, _error = validate_url(url)
         # This is implementation-dependent, but should be handled
 
 
@@ -165,6 +195,9 @@ class TestHTMLSanitizationSecurity:
         malicious = [
             "<scr<script>ipt>alert(1)</script>",
             "<<script>script>alert(1)<</script>/script>",
+            # Removing the inner pair must not reassemble an outer tag
+            "<scr<script></script>ipt>alert(1)</scr<script></script>ipt>",
+            "<scr\x00ipt>alert(1)</script>",
         ]
 
         for html in malicious:
@@ -304,6 +337,7 @@ class TestEnvironmentSecrets:
         monkeypatch.setenv("NEWSDIGEST_SECRET_KEY", "test-secret")
 
         from newsdigest.config.secrets import init_env
+
         init_env()
 
         secret = get_secret("SECRET_KEY")
@@ -326,8 +360,7 @@ class TestErrorMessageSecurity:
 
         # Create error with sensitive details
         error = NewsDigestError(
-            "Operation failed",
-            details={"path": "/home/user/.secrets/key.pem"}
+            "Operation failed", details={"path": "/home/user/.secrets/key.pem"}
         )
 
         # The error message itself shouldn't contain the path
@@ -340,8 +373,7 @@ class TestErrorMessageSecurity:
         from newsdigest.exceptions import FetchError
 
         error = FetchError(
-            "Failed to fetch URL",
-            details={"url": "https://api.example.com"}
+            "Failed to fetch URL", details={"url": "https://api.example.com"}
         )
 
         error_str = str(error)
@@ -406,8 +438,9 @@ class TestExtractionOutputSecurity:
         for pattern in sensitive_patterns:
             if pattern.lower() in output_lower:
                 # Only fail if it's not part of article content
-                assert pattern.lower() in content.lower(), \
+                assert pattern.lower() in content.lower(), (
                     f"Output contains sensitive pattern: {pattern}"
+                )
 
 
 # =============================================================================
@@ -424,7 +457,7 @@ class TestConfigurationSecurity:
         env_vars = config.to_env_vars()
 
         # Should not contain secret-like keys with values
-        for key, value in env_vars.items():
+        for key in env_vars:
             if "SECRET" in key.upper() or "KEY" in key.upper():
                 # If it's a secret field, value should be empty or masked
                 pass  # Config doesn't have secrets by default
@@ -449,7 +482,7 @@ class TestAbusePrevention:
 
     def test_content_length_limits(self) -> None:
         """Content length limits are enforced."""
-        is_valid, error = validate_text_content("x" * 10_000_000, max_length=1_000_000)
+        is_valid, _error = validate_text_content("x" * 10_000_000, max_length=1_000_000)
         assert is_valid is False
 
     def test_html_length_limits(self) -> None:
@@ -461,7 +494,7 @@ class TestAbusePrevention:
     def test_url_length_limits(self) -> None:
         """Extremely long URLs are rejected."""
         long_url = "https://example.com/" + "a" * 10_000
-        is_valid, error = validate_url(long_url)
+        _is_valid, _error = validate_url(long_url)
         # Should either reject or handle gracefully
         # Very long URLs are suspicious
 

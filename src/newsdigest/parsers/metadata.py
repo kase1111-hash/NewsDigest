@@ -17,7 +17,7 @@ class MetadataParser:
     - Schema.org markup
     """
 
-    def __init__(self, config: dict | None = None) -> None:
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize metadata parser.
 
         Args:
@@ -160,15 +160,15 @@ class MetadataParser:
         scripts = soup.find_all("script", attrs={"type": "application/ld+json"})
 
         for script in scripts:
+            if script.string is None:
+                continue
             try:
                 data = json.loads(script.string)
                 self._extract_from_json_ld(data, metadata)
             except (json.JSONDecodeError, TypeError):
                 continue
 
-    def _extract_from_json_ld(
-        self, data: Any, metadata: dict[str, Any]
-    ) -> None:
+    def _extract_from_json_ld(self, data: Any, metadata: dict[str, Any]) -> None:
         """Extract metadata from JSON-LD object.
 
         Args:
@@ -249,12 +249,12 @@ class MetadataParser:
         # Check link rel="canonical"
         link = soup.find("link", attrs={"rel": "canonical"})
         if link and link.get("href"):
-            return link["href"]
+            return str(link["href"])
 
         # Check og:url
         meta = soup.find("meta", attrs={"property": "og:url"})
         if meta and meta.get("content"):
-            return meta["content"]
+            return str(meta["content"])
 
         return None
 

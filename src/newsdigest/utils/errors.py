@@ -7,11 +7,12 @@ This module provides centralized error reporting with support for:
 - Breadcrumb tracking for debugging
 """
 
+import importlib.util
 import os
 import sys
 import traceback
-from collections.abc import Callable
-from contextlib import contextmanager
+from collections.abc import Callable, Generator
+from contextlib import contextmanager, suppress
 from datetime import datetime
 from enum import Enum
 from functools import wraps
@@ -73,7 +74,7 @@ class ErrorContext:
             level: Severity level.
             data: Additional data.
         """
-        breadcrumb = {
+        breadcrumb: dict[str, Any] = {
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "message": message,
             "category": category,
@@ -86,7 +87,7 @@ class ErrorContext:
 
         # Trim old breadcrumbs
         if len(self._breadcrumbs) > self._max_breadcrumbs:
-            self._breadcrumbs = self._breadcrumbs[-self._max_breadcrumbs:]
+            self._breadcrumbs = self._breadcrumbs[-self._max_breadcrumbs :]
 
     def set_tag(self, key: str, value: str) -> None:
         """Set a tag for filtering/grouping errors.
@@ -191,14 +192,10 @@ class ErrorReporter:
         self._environment: str = "development"
         self._release: str | None = None
         self._sample_rate: float = 1.0
-        self._error_handlers: list[Callable[[Exception, dict[str, Any]], None]] = []
+        self._error_handlers: list[Callable[[BaseException, dict[str, Any]], None]] = []
 
         # Check for sentry-sdk
-        try:
-            import sentry_sdk
-            self._sentry_available = True
-        except ImportError:
-            self._sentry_available = False
+        self._sentry_available = importlib.util.find_spec("sentry_sdk") is not None
 
     def configure(
         self,
@@ -263,9 +260,7 @@ class ErrorReporter:
             )
 
             self._initialized = True
-            logger.info(
-                f"Sentry initialized for environment: {self._environment}"
-            )
+            logger.info(f"Sentry initialized for environment: {self._environment}")
             return True
 
         except Exception as e:
@@ -275,7 +270,7 @@ class ErrorReporter:
 
     def add_error_handler(
         self,
-        handler: Callable[[Exception, dict[str, Any]], None],
+        handler: Callable[[BaseException, dict[str, Any]], None],
     ) -> None:
         """Add a custom error handler.
 
@@ -286,7 +281,7 @@ class ErrorReporter:
 
     def capture_exception(
         self,
-        exception: Exception | None = None,
+        exception: BaseException | None = None,
         severity: ErrorSeverity = ErrorSeverity.ERROR,
         extra: dict[str, Any] | None = None,
         tags: dict[str, str] | None = None,
@@ -354,7 +349,7 @@ class ErrorReporter:
                         )
 
                     scope.level = severity.value
-                    event_id = sentry_sdk.capture_exception(exception)
+                    event_id: str | None = sentry_sdk.capture_exception(exception)
                     return event_id
 
             except Exception as sentry_error:
@@ -398,7 +393,7 @@ class ErrorReporter:
                             scope.set_extra(key, value)
 
                     scope.level = severity.value
-                    event_id = sentry_sdk.capture_message(message)
+                    event_id: str | None = sentry_sdk.capture_message(message)
                     return event_id
 
             except Exception as sentry_error:
@@ -427,14 +422,16 @@ class ErrorReporter:
         if self._sentry_available and self._dsn:
             try:
                 import sentry_sdk
+
                 sentry_sdk.add_breadcrumb(
                     message=message,
                     category=category,
                     level=level,
                     data=data,
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                # Error reporting must never raise into the caller
+                logger.debug(f"Sentry call failed: {e}")
 
     def set_tag(self, key: str, value: str) -> None:
         """Set a global tag.
@@ -448,9 +445,11 @@ class ErrorReporter:
         if self._sentry_available and self._dsn:
             try:
                 import sentry_sdk
+
                 sentry_sdk.set_tag(key, value)
-            except Exception:
-                pass
+            except Exception as e:
+                # Error reporting must never raise into the caller
+                logger.debug(f"Sentry call failed: {e}")
 
     def set_user(
         self,
@@ -470,6 +469,7 @@ class ErrorReporter:
         if self._sentry_available and self._dsn:
             try:
                 import sentry_sdk
+
                 user_data = {}
                 if user_id:
                     user_data["id"] = user_id
@@ -478,8 +478,9 @@ class ErrorReporter:
                 if username:
                     user_data["username"] = username
                 sentry_sdk.set_user(user_data)
-            except Exception:
-                pass
+            except Exception as e:
+                # Error reporting must never raise into the caller
+                logger.debug(f"Sentry call failed: {e}")
 
     @property
     def is_configured(self) -> bool:
@@ -531,7 +532,7 @@ def configure_error_reporting(
 
 
 def capture_exception(
-    exception: Exception | None = None,
+    exception: BaseException | None = None,
     **kwargs: Any,
 ) -> str | None:
     """Capture an exception using global reporter.
@@ -606,6 +607,7 @@ def capture_errors(
         def my_function():
             pass
     """
+
     def decorator(func: F) -> F:
         @wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -614,10 +616,8 @@ def capture_errors(
             except Exception as e:
                 extra = {"function": func.__name__}
                 if extra_context:
-                    try:
+                    with suppress(Exception):
                         extra.update(extra_context(*args, **kwargs))
-                    except Exception:
-                        pass
 
                 capture_exception(e, severity=severity, extra=extra)
 
@@ -631,10 +631,8 @@ def capture_errors(
             except Exception as e:
                 extra = {"function": func.__name__}
                 if extra_context:
-                    try:
+                    with suppress(Exception):
                         extra.update(extra_context(*args, **kwargs))
-                    except Exception:
-                        pass
 
                 capture_exception(e, severity=severity, extra=extra)
 
@@ -642,6 +640,7 @@ def capture_errors(
                     raise
 
         import asyncio
+
         if asyncio.iscoroutinefunction(func):
             return async_wrapper  # type: ignore
         return wrapper  # type: ignore
@@ -655,7 +654,7 @@ def error_boundary(
     severity: ErrorSeverity = ErrorSeverity.ERROR,
     reraise: bool = True,
     extra: dict[str, Any] | None = None,
-):
+) -> Generator[None, None, None]:
     """Context manager for capturing errors within a scope.
 
     Args:
@@ -713,7 +712,9 @@ def format_exception(
 
     # Check for NewsDigest exceptions with cause
     if hasattr(exception, "cause") and exception.cause:
-        parts.append(f"  Caused by: {type(exception.cause).__name__}: {exception.cause}")
+        parts.append(
+            f"  Caused by: {type(exception.cause).__name__}: {exception.cause}"
+        )
 
     # Check for details
     if hasattr(exception, "details") and exception.details:
@@ -722,13 +723,17 @@ def format_exception(
 
     # Add traceback if requested
     if include_traceback:
-        tb = "".join(traceback.format_exception(type(exception), exception, exception.__traceback__))
+        tb = "".join(
+            traceback.format_exception(
+                type(exception), exception, exception.__traceback__
+            )
+        )
         parts.append(f"\nTraceback:\n{tb}")
 
     return "\n".join(parts)
 
 
-def get_exception_chain(exception: Exception) -> list[Exception]:
+def get_exception_chain(exception: BaseException) -> list[BaseException]:
     """Get the chain of exceptions (cause chain).
 
     Args:

@@ -50,7 +50,7 @@ class RetryConfig:
         base_delay: float = 1.0,
         max_delay: float = 30.0,
         exponential_base: float = 2.0,
-        retry_status_codes: set | None = None,
+        retry_status_codes: set[int] | None = None,
     ) -> None:
         """Initialize retry configuration.
 
@@ -76,7 +76,7 @@ class RetryConfig:
         Returns:
             Delay in seconds.
         """
-        delay = self.base_delay * (self.exponential_base ** attempt)
+        delay = self.base_delay * (self.exponential_base**attempt)
         return min(delay, self.max_delay)
 
     def should_retry(self, status_code: int) -> bool:
@@ -217,9 +217,7 @@ class HTTPClient:
                 await self.rate_limiter.acquire()
 
                 # Make request
-                response = await client.request(
-                    method, url, headers=headers, **kwargs
-                )
+                response = await client.request(method, url, headers=headers, **kwargs)
 
                 # Check if we should retry on this status
                 if (

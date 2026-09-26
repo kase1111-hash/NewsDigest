@@ -47,6 +47,61 @@ class OutputConfig(BaseModel):
     show_warnings: bool = True
 
 
+# Environment variables (after the prefix) and the setting each one sets
+_ENV_SETTINGS: list[tuple[str, tuple[str, ...], type]] = [
+    ("MODE", ("extraction", "mode"), str),
+    ("MIN_SENTENCE_DENSITY", ("extraction", "min_sentence_density"), float),
+    ("UNNAMED_SOURCES", ("extraction", "unnamed_sources"), str),
+    ("SPECULATION", ("extraction", "speculation"), str),
+    ("MAX_HEDGES_PER_SENTENCE", ("extraction", "max_hedges_per_sentence"), int),
+    ("EMOTIONAL_LANGUAGE", ("extraction", "emotional_language"), str),
+    ("QUOTES_KEEP_ATTRIBUTED", ("extraction", "quotes", "keep_attributed"), bool),
+    ("QUOTES_KEEP_UNATTRIBUTED", ("extraction", "quotes", "keep_unattributed"), bool),
+    ("QUOTES_FLAG_CIRCULAR", ("extraction", "quotes", "flag_circular"), bool),
+    ("DIGEST_PERIOD", ("digest", "period"), str),
+    ("DIGEST_MAX_ITEMS", ("digest", "max_items"), int),
+    ("DIGEST_CLUSTERING", ("digest", "clustering_enabled"), bool),
+    ("DIGEST_DEDUP", ("digest", "deduplication_enabled"), bool),
+    ("SIMILARITY_THRESHOLD", ("digest", "similarity_threshold"), float),
+    ("MIN_NOVELTY_SCORE", ("digest", "min_novelty_score"), float),
+    ("OUTPUT_FORMAT", ("output", "format"), str),
+    ("OUTPUT_SHOW_STATS", ("output", "show_stats"), bool),
+    ("OUTPUT_INCLUDE_LINKS", ("output", "include_links"), bool),
+    ("OUTPUT_SHOW_WARNINGS", ("output", "show_warnings"), bool),
+    ("SPACY_MODEL", ("spacy_model",), str),
+    ("HTTP_TIMEOUT", ("http_timeout",), int),
+    ("HTTP_RETRIES", ("http_retries",), int),
+    ("REQUESTS_PER_SECOND", ("requests_per_second",), float),
+    ("CACHE_ENABLED", ("cache_enabled",), bool),
+    ("CACHE_TTL", ("cache_ttl",), int),
+    ("CACHE_MAX_SIZE", ("cache_max_size",), int),
+    ("CORS_ORIGINS", ("cors_origins",), list),
+]
+
+
+def _parse_env_value(raw: str, kind: type) -> Any:
+    """Convert an environment variable string to a setting value.
+
+    Raises:
+        ValueError: If the value cannot be converted.
+    """
+    if kind is bool:
+        return raw.strip().lower() in ("true", "1", "yes", "on")
+    if kind is list:
+        return [item.strip() for item in raw.split(",") if item.strip()]
+    return kind(raw)
+
+
+def _deep_merge(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
+    """Recursively merge overrides into base (in place) and return base."""
+    for key, value in overrides.items():
+        if isinstance(value, dict) and isinstance(base.get(key), dict):
+            _deep_merge(base[key], value)
+        else:
+            base[key] = value
+    return base
+
+
 class Config(BaseModel):
     """Main configuration for NewsDigest."""
 
@@ -87,16 +142,81 @@ class Config(BaseModel):
         Returns:
             Config instance.
         """
+        return cls(**cls._read_file(path))
+
+    @classmethod
+    def load(
+        cls, path: str | Path | None = None, prefix: str = "NEWSDIGEST_"
+    ) -> "Config":
+        """Load user configuration: the config file, then environment overrides.
+
+        The file is `path`, else ``$NEWSDIGEST_CONFIG``, else
+        ``~/.newsdigest/config.yml``; a missing file means defaults.
+        Environment variables that are set override values from the file.
+
+        Args:
+            path: Optional path to a YAML configuration file.
+            prefix: Environment variable prefix.
+
+        Returns:
+            Config instance.
+        """
+        if path is None:
+            path = os.environ.get(f"{prefix}CONFIG") or (
+                Path.home() / ".newsdigest" / "config.yml"
+            )
+        data = _deep_merge(cls._read_file(path), cls._env_overrides(prefix))
+        return cls(**data)
+
+    @staticmethod
+    def _read_file(path: str | Path) -> dict[str, Any]:
+        """Read a YAML configuration file.
+
+        Args:
+            path: Path to the file ("~" is expanded).
+
+        Returns:
+            Configuration mapping, or an empty dict if the file is missing.
+        """
         import yaml
 
-        path = Path(path)
+        path = Path(path).expanduser()
         if not path.exists():
-            return cls()
+            return {}
 
-        with open(path) as f:
+        with path.open(encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
 
-        return cls(**data)
+        if not isinstance(data, dict):
+            raise ValueError(f"Configuration file must contain a mapping: {path}")
+        return data
+
+    @staticmethod
+    def _env_overrides(prefix: str) -> dict[str, Any]:
+        """Collect settings from environment variables that are set.
+
+        Values that cannot be converted to the setting's type are ignored.
+
+        Args:
+            prefix: Environment variable prefix.
+
+        Returns:
+            Nested mapping of settings to override.
+        """
+        overrides: dict[str, Any] = {}
+        for name, setting_path, kind in _ENV_SETTINGS:
+            raw = os.environ.get(f"{prefix}{name}")
+            if raw is None:
+                continue
+            try:
+                value = _parse_env_value(raw, kind)
+            except ValueError:
+                continue
+            target = overrides
+            for key in setting_path[:-1]:
+                target = target.setdefault(key, {})
+            target[setting_path[-1]] = value
+        return overrides
 
     @classmethod
     def from_env(cls, prefix: str = "NEWSDIGEST_") -> "Config":
@@ -112,7 +232,9 @@ class Config(BaseModel):
         - NEWSDIGEST_CACHE_TTL: Cache TTL in seconds
         - NEWSDIGEST_OUTPUT_FORMAT: Output format (markdown, json, text)
         - NEWSDIGEST_SIMILARITY_THRESHOLD: Similarity threshold for dedup
-        - SENTRY_DSN: Sentry DSN for error reporting
+        - NEWSDIGEST_CORS_ORIGINS: Comma-separated allowed API origins
+
+        See _ENV_SETTINGS for the full list. Unset variables use defaults.
 
         Args:
             prefix: Environment variable prefix.
@@ -120,70 +242,7 @@ class Config(BaseModel):
         Returns:
             Config instance.
         """
-        def get_env(key: str, default: str = "") -> str:
-            return os.environ.get(f"{prefix}{key}", os.environ.get(key, default))
-
-        def get_env_bool(key: str, default: bool = False) -> bool:
-            val = get_env(key, str(default).lower())
-            return val.lower() in ("true", "1", "yes", "on")
-
-        def get_env_int(key: str, default: int) -> int:
-            try:
-                return int(get_env(key, str(default)))
-            except ValueError:
-                return default
-
-        def get_env_float(key: str, default: float) -> float:
-            try:
-                return float(get_env(key, str(default)))
-            except ValueError:
-                return default
-
-        # Build extraction config
-        extraction = ExtractionConfig(
-            mode=get_env("MODE", "standard"),
-            min_sentence_density=get_env_float("MIN_SENTENCE_DENSITY", 0.3),
-            unnamed_sources=get_env("UNNAMED_SOURCES", "flag"),
-            speculation=get_env("SPECULATION", "remove"),
-            max_hedges_per_sentence=get_env_int("MAX_HEDGES_PER_SENTENCE", 2),
-            emotional_language=get_env("EMOTIONAL_LANGUAGE", "remove"),
-            quotes=QuotesConfig(
-                keep_attributed=get_env_bool("QUOTES_KEEP_ATTRIBUTED", True),
-                keep_unattributed=get_env_bool("QUOTES_KEEP_UNATTRIBUTED", False),
-                flag_circular=get_env_bool("QUOTES_FLAG_CIRCULAR", True),
-            ),
-        )
-
-        # Build digest config
-        digest = DigestConfig(
-            period=get_env("DIGEST_PERIOD", "24h"),
-            max_items=get_env_int("DIGEST_MAX_ITEMS", 100),
-            clustering_enabled=get_env_bool("DIGEST_CLUSTERING", True),
-            deduplication_enabled=get_env_bool("DIGEST_DEDUP", True),
-            similarity_threshold=get_env_float("SIMILARITY_THRESHOLD", 0.85),
-            min_novelty_score=get_env_float("MIN_NOVELTY_SCORE", 0.3),
-        )
-
-        # Build output config
-        output = OutputConfig(
-            format=get_env("OUTPUT_FORMAT", "markdown"),
-            show_stats=get_env_bool("OUTPUT_SHOW_STATS", True),
-            include_links=get_env_bool("OUTPUT_INCLUDE_LINKS", True),
-            show_warnings=get_env_bool("OUTPUT_SHOW_WARNINGS", True),
-        )
-
-        return cls(
-            extraction=extraction,
-            digest=digest,
-            output=output,
-            spacy_model=get_env("SPACY_MODEL", "en_core_web_sm"),
-            http_timeout=get_env_int("HTTP_TIMEOUT", 30),
-            http_retries=get_env_int("HTTP_RETRIES", 3),
-            requests_per_second=get_env_float("REQUESTS_PER_SECOND", 1.0),
-            cache_enabled=get_env_bool("CACHE_ENABLED", True),
-            cache_ttl=get_env_int("CACHE_TTL", 3600),
-            cache_max_size=get_env_int("CACHE_MAX_SIZE", 1000),
-        )
+        return cls(**cls._env_overrides(prefix))
 
     def save(self, path: str | Path | None = None) -> None:
         """Save configuration to YAML file.
@@ -196,8 +255,9 @@ class Config(BaseModel):
         path = Path(path) if path else self.config_dir / "config.yml"
         path.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(path, "w") as f:
-            yaml.dump(self.model_dump(), f, default_flow_style=False)
+        with path.open("w", encoding="utf-8") as f:
+            # JSON mode turns Path values into plain strings that safe_load reads
+            yaml.dump(self.model_dump(mode="json"), f, default_flow_style=False)
 
     def to_env_vars(self, prefix: str = "NEWSDIGEST_") -> dict[str, str]:
         """Export configuration as environment variables.

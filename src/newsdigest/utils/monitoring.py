@@ -4,13 +4,20 @@ Provides health checks, metrics collection, and alerting capabilities.
 """
 
 import asyncio
+import contextlib
 import time
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Callable, Coroutine
+from typing import Any
 
 import httpx
+
+from newsdigest.utils.logging import get_logger
+
+
+logger = get_logger(__name__)
 
 
 class HealthStatus(Enum):
@@ -141,7 +148,7 @@ class HealthMonitor:
 
         return {
             "status": overall.value,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "checks": {
                 r.name: {
                     "status": r.status.value,
@@ -206,7 +213,7 @@ class AlertManager:
         # Store in history
         self._alert_history.append(alert)
         if len(self._alert_history) > self._max_history:
-            self._alert_history = self._alert_history[-self._max_history:]
+            self._alert_history = self._alert_history[-self._max_history :]
 
         # Send to webhooks
         for webhook in self._webhooks:
@@ -214,10 +221,8 @@ class AlertManager:
 
         # Send to custom handlers
         for handler in self._handlers:
-            try:
+            with contextlib.suppress(Exception):  # Don't fail on handler errors
                 await handler(alert)
-            except Exception:
-                pass  # Don't fail on handler errors
 
     async def _send_webhook(self, url: str, alert: Alert) -> None:
         """Send alert to webhook.
@@ -245,7 +250,7 @@ class AlertManager:
                         {
                             "title": "Time",
                             "value": datetime.fromtimestamp(
-                                alert.timestamp, tz=timezone.utc
+                                alert.timestamp, tz=UTC
                             ).isoformat(),
                             "short": True,
                         },
@@ -255,10 +260,8 @@ class AlertManager:
             ]
         }
 
-        try:
+        with contextlib.suppress(Exception):  # Don't fail on webhook errors
             await self._client.post(url, json=payload)
-        except Exception:
-            pass  # Don't fail on webhook errors
 
     def get_recent_alerts(
         self,
@@ -328,7 +331,7 @@ class MetricsCollector:
 
         # Trim old points
         if len(self._metrics[name]) > self._max_points:
-            self._metrics[name] = self._metrics[name][-self._max_points:]
+            self._metrics[name] = self._metrics[name][-self._max_points :]
 
     def increment(
         self,
@@ -464,10 +467,8 @@ class ServiceMonitor:
         self._running = False
         if self._task:
             self._task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._task
-            except asyncio.CancelledError:
-                pass
 
     async def _monitor_loop(self) -> None:
         """Background monitoring loop."""
@@ -481,9 +482,7 @@ class ServiceMonitor:
                         f"health_check_{name}_latency_ms",
                         check.get("latency_ms", 0),
                     )
-                    status_value = (
-                        1 if check.get("status") == "healthy" else 0
-                    )
+                    status_value = 1 if check.get("status") == "healthy" else 0
                     self.metrics.record(
                         f"health_check_{name}_status",
                         status_value,
@@ -502,8 +501,9 @@ class ServiceMonitor:
                                 )
                             )
 
-            except Exception:
-                pass  # Don't crash on monitor errors
+            except Exception as e:
+                # Don't crash on monitor errors
+                logger.warning(f"Health monitor check failed: {e}")
 
             await asyncio.sleep(self._check_interval)
 

@@ -1,6 +1,7 @@
 """Source validator for NewsDigest."""
 
 import re
+from typing import Any
 
 from newsdigest.analyzers.base import BaseAnalyzer
 from newsdigest.core.result import RemovalReason, Sentence
@@ -9,15 +10,15 @@ from newsdigest.core.result import RemovalReason, Sentence
 # Patterns for named source attribution
 NAMED_SOURCE_PATTERNS: list[str] = [
     # Direct attribution: "said John Smith"
-    r'(?:said|says|told|tells|stated|announced|confirmed|denied|claimed|reported)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)',
+    r"(?:said|says|told|tells|stated|announced|confirmed|denied|claimed|reported)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)",
     # Title attribution: "CEO John Smith said"
-    r'(?:CEO|CFO|CTO|COO|President|Chairman|Director|Secretary|Minister|Senator|Representative|Governor|Mayor|Chief|Professor|Dr\.|Mr\.|Mrs\.|Ms\.)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+(?:said|says|told|stated)',
+    r"(?:CEO|CFO|CTO|COO|President|Chairman|Director|Secretary|Minister|Senator|Representative|Governor|Mayor|Chief|Professor|Dr\.|Mr\.|Mrs\.|Ms\.)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+(?:said|says|told|stated)",
     # According to Name
-    r'according to\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)',
+    r"according to\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)",
     # Name, title, said
-    r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+),\s+(?:a|an|the)?\s*(?:\w+\s+)*(?:at|of|for|with)\s+[\w\s]+,?\s+(?:said|says|told|stated)',
+    r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+),\s+(?:a|an|the)?\s*(?:\w+\s+)*(?:at|of|for|with)\s+[\w\s]+,?\s+(?:said|says|told|stated)",
     # Organization announced/said
-    r'(?:the\s+)?([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)*)\s+(?:announced|said|stated|reported|confirmed|denied)',
+    r"(?:the\s+)?([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)*)\s+(?:announced|said|stated|reported|confirmed|denied)",
 ]
 
 # Patterns for unnamed sources (flag these)
@@ -58,7 +59,7 @@ class SourceValidator(BaseAnalyzer):
     - 'remove': Remove sentences with only unnamed sources
     """
 
-    def __init__(self, config: dict | None = None) -> None:
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize source validator."""
         super().__init__(config)
         self._named_patterns = [
@@ -203,7 +204,7 @@ class SourceValidator(BaseAnalyzer):
         text_lower = text.lower()
         return any(pattern.search(text_lower) for pattern in self._unnamed_patterns)
 
-    def get_source_warnings(self, sentences: list[Sentence]) -> list[dict]:
+    def get_source_warnings(self, sentences: list[Sentence]) -> list[dict[str, str]]:
         """Generate warnings for unnamed sources.
 
         Args:

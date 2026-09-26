@@ -27,6 +27,7 @@ from newsdigest.cli.sources import sources  # noqa: E402
 from newsdigest.cli.stats import stats  # noqa: E402
 from newsdigest.cli.watch import watch  # noqa: E402
 
+
 cli.add_command(extract)
 cli.add_command(compare)
 cli.add_command(stats)

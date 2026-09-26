@@ -97,9 +97,7 @@ class AnalyticsStore:
             The recorded extraction record.
         """
         compression = (
-            1 - (compressed_words / original_words)
-            if original_words > 0
-            else 0.0
+            1 - (compressed_words / original_words) if original_words > 0 else 0.0
         )
 
         record = ExtractionRecord(
@@ -188,16 +186,12 @@ class AnalyticsStore:
         total_original = sum(r.original_words for r in successful)
         total_compressed = sum(r.compressed_words for r in successful)
         avg_compression = (
-            1 - (total_compressed / total_original)
-            if total_original > 0
-            else 0.0
+            1 - (total_compressed / total_original) if total_original > 0 else 0.0
         )
 
         processing_times = [r.processing_time_ms for r in successful]
         avg_processing = (
-            sum(processing_times) / len(processing_times)
-            if processing_times
-            else 0.0
+            sum(processing_times) / len(processing_times) if processing_times else 0.0
         )
 
         return AggregateStats(
@@ -210,9 +204,7 @@ class AnalyticsStore:
             total_compressed_words=total_compressed,
             avg_compression_ratio=avg_compression,
             total_claims=sum(r.claims_extracted for r in successful),
-            total_speculation_removed=sum(
-                r.speculation_removed for r in successful
-            ),
+            total_speculation_removed=sum(r.speculation_removed for r in successful),
             total_emotional_removed=sum(r.emotional_removed for r in successful),
             avg_processing_time_ms=avg_processing,
         )
@@ -248,7 +240,7 @@ class AnalyticsStore:
             return
 
         try:
-            with open(self._storage_path, "r", encoding="utf-8") as f:
+            with self._storage_path.open(encoding="utf-8") as f:
                 data = json.load(f)
 
             self._records = [
@@ -266,7 +258,7 @@ class AnalyticsStore:
 
         data = {"records": [asdict(r) for r in self._records]}
 
-        with open(self._storage_path, "w", encoding="utf-8") as f:
+        with self._storage_path.open("w", encoding="utf-8") as f:
             json.dump(data, f)
 
 
@@ -384,7 +376,7 @@ class SourceStore:
             return
 
         try:
-            with open(self._storage_path, "r", encoding="utf-8") as f:
+            with self._storage_path.open(encoding="utf-8") as f:
                 data = json.load(f)
             self._sources = data.get("sources", [])
         except (json.JSONDecodeError, OSError):
@@ -399,5 +391,5 @@ class SourceStore:
 
         data = {"sources": self._sources}
 
-        with open(self._storage_path, "w", encoding="utf-8") as f:
+        with self._storage_path.open("w", encoding="utf-8") as f:
             json.dump(data, f)

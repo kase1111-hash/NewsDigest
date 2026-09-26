@@ -6,12 +6,14 @@ usage statistics, and optional external reporting.
 
 import time
 from collections import defaultdict
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from functools import wraps
 from threading import Lock
-from typing import Any, Callable, TypeVar
+from typing import Any, TypeVar
+
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -63,14 +65,16 @@ class CounterStats:
         """Increment the counter."""
         self.value += amount
         self.last_increment = amount
-        self.last_updated = datetime.now(timezone.utc)
+        self.last_updated = datetime.now(UTC)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "value": self.value,
             "last_increment": self.last_increment,
-            "last_updated": self.last_updated.isoformat() if self.last_updated else None,
+            "last_updated": self.last_updated.isoformat()
+            if self.last_updated
+            else None,
         }
 
 
@@ -88,7 +92,7 @@ class GaugeStats:
         self.value = value
         self.min_value = min(self.min_value, value)
         self.max_value = max(self.max_value, value)
-        self.last_updated = datetime.now(timezone.utc)
+        self.last_updated = datetime.now(UTC)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
@@ -97,7 +101,9 @@ class GaugeStats:
             "value": self.value,
             "min_value": self.min_value if has_data else None,
             "max_value": self.max_value if has_data else None,
-            "last_updated": self.last_updated.isoformat() if self.last_updated else None,
+            "last_updated": self.last_updated.isoformat()
+            if self.last_updated
+            else None,
         }
 
 
@@ -122,9 +128,11 @@ class MetricsCollector:
     _timings: dict[str, TimingStats] = field(default_factory=dict)
     _counters: dict[str, CounterStats] = field(default_factory=dict)
     _gauges: dict[str, GaugeStats] = field(default_factory=dict)
-    _histograms: dict[str, list[float]] = field(default_factory=lambda: defaultdict(list))
+    _histograms: dict[str, list[float]] = field(
+        default_factory=lambda: defaultdict(list)
+    )
     _lock: Lock = field(default_factory=Lock)
-    _start_time: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    _start_time: datetime = field(default_factory=lambda: datetime.now(UTC))
     _enabled: bool = True
 
     def enable(self) -> None:
@@ -136,7 +144,7 @@ class MetricsCollector:
         self._enabled = False
 
     @contextmanager
-    def timer(self, name: str):
+    def timer(self, name: str) -> Generator[None, None, None]:
         """Context manager for timing operations.
 
         Args:
@@ -171,8 +179,7 @@ class MetricsCollector:
 
         Example:
             >>> @metrics.timed("extraction")
-            ... def extract(url):
-            ...     ...
+            ... def extract(url): ...
         """
 
         def decorator(func: F) -> F:
@@ -310,7 +317,7 @@ class MetricsCollector:
             Dictionary with all metrics.
         """
         with self._lock:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             uptime = (now - self._start_time).total_seconds()
 
             return {
@@ -346,7 +353,7 @@ class MetricsCollector:
             self._counters.clear()
             self._gauges.clear()
             self._histograms.clear()
-            self._start_time = datetime.now(timezone.utc)
+            self._start_time = datetime.now(UTC)
 
 
 # Global metrics collector instance
@@ -369,7 +376,6 @@ def get_metrics() -> MetricsCollector:
 
 def reset_metrics() -> None:
     """Reset the global metrics collector."""
-    global _metrics
     with _metrics_lock:
         if _metrics is not None:
             _metrics.reset()
@@ -397,7 +403,7 @@ def record_histogram(name: str, value: float) -> None:
 
 
 @contextmanager
-def timer(name: str):
+def timer(name: str) -> Generator[None, None, None]:
     """Context manager for timing operations using global collector."""
     with get_metrics().timer(name):
         yield

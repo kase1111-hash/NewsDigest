@@ -1,8 +1,10 @@
 """HTML cleaner for NewsDigest."""
 
 import re
+from typing import Any
 
-from bs4 import BeautifulSoup, Comment, NavigableString, Tag
+from bs4 import BeautifulSoup, Comment, Tag
+from bs4.element import NavigableString, PreformattedString
 
 
 # Elements to completely remove
@@ -41,7 +43,8 @@ NON_CONTENT_PATTERNS: list[str] = [
     r"menu",
     r"sidebar",
     r"widget",
-    r"ad[s-]?",
+    # "ad"/"ads" only as a whole word: bare "ad" is inside headline, lead...
+    r"(?<![a-z])ads?(?![a-z])",
     r"advert",
     r"sponsor",
     r"promo",
@@ -71,6 +74,61 @@ NON_CONTENT_PATTERNS: list[str] = [
 ]
 
 
+# Elements whose text forms one paragraph of output
+BLOCK_ELEMENTS: set[str] = {
+    "p",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "li",
+    "blockquote",
+    "pre",
+    "figcaption",
+    "dt",
+    "dd",
+    "td",
+    "th",
+}
+
+# Elements whose text continues the surrounding paragraph
+INLINE_ELEMENTS: set[str] = {
+    "a",
+    "abbr",
+    "b",
+    "bdi",
+    "bdo",
+    "cite",
+    "code",
+    "data",
+    "del",
+    "dfn",
+    "em",
+    "i",
+    "ins",
+    "kbd",
+    "mark",
+    "q",
+    "s",
+    "samp",
+    "small",
+    "span",
+    "strong",
+    "sub",
+    "sup",
+    "time",
+    "u",
+    "var",
+    "wbr",
+}
+
+# Content containers never removed by class/id heuristics: a page's
+# <body class="has-ads"> or <article class="post has-comments"> is the content
+PROTECTED_ELEMENTS: set[str] = {"html", "body", "main", "article"}
+
+
 class HTMLCleaner:
     """Cleans HTML and extracts text content.
 
@@ -82,7 +140,7 @@ class HTMLCleaner:
     - Non-content elements based on class/id patterns
     """
 
-    def __init__(self, config: dict | None = None) -> None:
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize HTML cleaner.
 
         Args:
@@ -140,15 +198,12 @@ class HTMLCleaner:
             soup: BeautifulSoup object to modify in place.
         """
         for element in soup.find_all(True):  # True matches all tags
-            if not isinstance(element, Tag):
+            if not isinstance(element, Tag) or element.name in PROTECTED_ELEMENTS:
                 continue
 
             # Check class attribute
-            classes = element.get("class", [])
-            if isinstance(classes, list):
-                class_str = " ".join(classes)
-            else:
-                class_str = str(classes)
+            classes = element.get("class", "")
+            class_str = " ".join(classes) if isinstance(classes, list) else str(classes)
 
             # Check id attribute
             elem_id = element.get("id", "") or ""
@@ -174,41 +229,64 @@ class HTMLCleaner:
         main = (
             soup.find("main")
             or soup.find("article")
-            or soup.find(attrs={"role": "main"})
+            or soup.find(None, attrs={"role": "main"})
             or soup.find(class_=re.compile(r"content|article|post|entry"))
         )
 
         target = main if main else soup
 
+        # Line breaks separate text within a block; keep them as whitespace
+        for br in target.find_all("br"):
+            br.replace_with("\n")
+
         # Extract text with paragraph preservation
-        paragraphs = []
-        for element in target.descendants:
-            if isinstance(element, NavigableString):
-                text = str(element).strip()
-                if text:
-                    paragraphs.append(text)
-            elif isinstance(element, Tag) and element.name in [
-                "p",
-                "h1",
-                "h2",
-                "h3",
-                "h4",
-                "h5",
-                "h6",
-                "li",
-                "blockquote",
-            ]:
-                text = element.get_text(separator=" ", strip=True)
-                if text:
-                    paragraphs.append(text)
+        paragraphs: list[str] = []
+        self._collect_paragraphs(target, paragraphs)
 
         # Deduplicate adjacent identical paragraphs
-        unique_paragraphs = []
+        unique_paragraphs: list[str] = []
         for p in paragraphs:
             if not unique_paragraphs or p != unique_paragraphs[-1]:
                 unique_paragraphs.append(p)
 
         return "\n\n".join(unique_paragraphs)
+
+    def _collect_paragraphs(self, node: Tag, paragraphs: list[str]) -> None:
+        """Collect each block of text once, in document order.
+
+        Block elements become one paragraph each; inline elements and loose
+        text are joined with their neighbours; other containers are walked.
+
+        Args:
+            node: Element to walk.
+            paragraphs: List that paragraphs are appended to.
+        """
+        inline_parts: list[str] = []
+
+        def flush() -> None:
+            text = " ".join("".join(inline_parts).split())
+            if text:
+                paragraphs.append(text)
+            inline_parts.clear()
+
+        for child in node.children:
+            if isinstance(child, PreformattedString):
+                # Comments, doctypes, CDATA and the like are not content
+                continue
+            if isinstance(child, NavigableString):
+                inline_parts.append(str(child))
+            elif isinstance(child, Tag):
+                if child.name in INLINE_ELEMENTS:
+                    inline_parts.append(child.get_text())
+                elif child.name in BLOCK_ELEMENTS:
+                    flush()
+                    text = " ".join(child.get_text().split())
+                    if text:
+                        paragraphs.append(text)
+                else:
+                    flush()
+                    self._collect_paragraphs(child, paragraphs)
+        flush()
 
     def _clean_whitespace(self, text: str) -> str:
         """Clean up whitespace in text.
@@ -231,7 +309,7 @@ class HTMLCleaner:
 
         return text.strip()
 
-    def get_links(self, html: str) -> list[dict]:
+    def get_links(self, html: str) -> list[dict[str, Any]]:
         """Extract links from HTML.
 
         Args:
@@ -251,7 +329,7 @@ class HTMLCleaner:
 
         return links
 
-    def get_images(self, html: str) -> list[dict]:
+    def get_images(self, html: str) -> list[dict[str, Any]]:
         """Extract images from HTML.
 
         Args:

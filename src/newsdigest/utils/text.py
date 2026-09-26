@@ -6,55 +6,171 @@ and reduces code duplication (DRY principle).
 """
 
 import re  # noqa: I001
+from collections.abc import Set as AbstractSet
 
 # Punctuation characters to strip from words (deduplicated set)
 # Includes standard ASCII and common Unicode punctuation
-PUNCTUATION_CHARS = ".,!?;:'\"()-[]{}«»""''…—-"
+PUNCTUATION_CHARS = (
+    ".,!?;:'\"()-[]{}\u00ab\u00bb\u201c\u201d\u2018\u2019\u2026\u2014\u2013"
+)
 
 
 # =============================================================================
 # COMMON STOP WORDS
 # =============================================================================
 
-STOP_WORDS: frozenset[str] = frozenset({
-    # Articles
-    "a", "an", "the",
-    # Be verbs
-    "is", "are", "was", "were", "be", "been", "being",
-    # Have verbs
-    "have", "has", "had",
-    # Do verbs
-    "do", "does", "did",
-    # Modal verbs
-    "will", "would", "could", "should", "may", "might", "must", "shall", "can",
-    # Prepositions
-    "to", "of", "in", "for", "on", "with", "at", "by", "from", "as", "into",
-    "through", "during", "before", "after", "above", "below", "between",
-    "under", "over", "out", "up", "down", "off", "about", "around",
-    # Conjunctions
-    "and", "but", "or", "nor", "so", "yet", "both", "either", "neither",
-    # Pronouns
-    "i", "me", "my", "mine", "myself",
-    "you", "your", "yours", "yourself",
-    "he", "him", "his", "himself",
-    "she", "her", "hers", "herself",
-    "it", "its", "itself",
-    "we", "us", "our", "ours", "ourselves",
-    "they", "them", "their", "theirs", "themselves",
-    "this", "that", "these", "those",
-    "who", "whom", "whose", "which", "what",
-    # Adverbs/others
-    "not", "only", "own", "same", "than", "too", "very", "just", "also",
-    "again", "further", "then", "once", "here", "there", "when", "where",
-    "why", "how", "all", "each", "every", "any", "some", "no", "other",
-    # Common verbs
-    "said", "says", "told", "asked", "added", "noted", "stated",
-})
+STOP_WORDS: frozenset[str] = frozenset(
+    {
+        # Articles
+        "a",
+        "an",
+        "the",
+        # Be verbs
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        # Have verbs
+        "have",
+        "has",
+        "had",
+        # Do verbs
+        "do",
+        "does",
+        "did",
+        # Modal verbs
+        "will",
+        "would",
+        "could",
+        "should",
+        "may",
+        "might",
+        "must",
+        "shall",
+        "can",
+        # Prepositions
+        "to",
+        "of",
+        "in",
+        "for",
+        "on",
+        "with",
+        "at",
+        "by",
+        "from",
+        "as",
+        "into",
+        "through",
+        "during",
+        "before",
+        "after",
+        "above",
+        "below",
+        "between",
+        "under",
+        "over",
+        "out",
+        "up",
+        "down",
+        "off",
+        "about",
+        "around",
+        # Conjunctions
+        "and",
+        "but",
+        "or",
+        "nor",
+        "so",
+        "yet",
+        "both",
+        "either",
+        "neither",
+        # Pronouns
+        "i",
+        "me",
+        "my",
+        "mine",
+        "myself",
+        "you",
+        "your",
+        "yours",
+        "yourself",
+        "he",
+        "him",
+        "his",
+        "himself",
+        "she",
+        "her",
+        "hers",
+        "herself",
+        "it",
+        "its",
+        "itself",
+        "we",
+        "us",
+        "our",
+        "ours",
+        "ourselves",
+        "they",
+        "them",
+        "their",
+        "theirs",
+        "themselves",
+        "this",
+        "that",
+        "these",
+        "those",
+        "who",
+        "whom",
+        "whose",
+        "which",
+        "what",
+        # Adverbs/others
+        "not",
+        "only",
+        "own",
+        "same",
+        "than",
+        "too",
+        "very",
+        "just",
+        "also",
+        "again",
+        "further",
+        "then",
+        "once",
+        "here",
+        "there",
+        "when",
+        "where",
+        "why",
+        "how",
+        "all",
+        "each",
+        "every",
+        "any",
+        "some",
+        "no",
+        "other",
+        # Common verbs
+        "said",
+        "says",
+        "told",
+        "asked",
+        "added",
+        "noted",
+        "stated",
+    }
+)
 
 
 # =============================================================================
 # TEXT CLEANING UTILITIES
 # =============================================================================
+
 
 def strip_punctuation(word: str) -> str:
     """Remove leading/trailing punctuation from a word.
@@ -102,7 +218,9 @@ def fix_punctuation_spacing(text: str) -> str:
     return text
 
 
-def get_content_words(text: str, stop_words: set[str] | None = None) -> list[str]:
+def get_content_words(
+    text: str, stop_words: AbstractSet[str] | None = None
+) -> list[str]:
     """Extract content words (non-stop words) from text.
 
     Args:
@@ -119,8 +237,7 @@ def get_content_words(text: str, stop_words: set[str] | None = None) -> list[str
     return [
         strip_punctuation(w)
         for w in words
-        if strip_punctuation(w) not in stop_words
-        and len(strip_punctuation(w)) > 2
+        if strip_punctuation(w) not in stop_words and len(strip_punctuation(w)) > 2
     ]
 
 
@@ -140,7 +257,10 @@ def word_count(text: str) -> int:
 # PATTERN MATCHING UTILITIES
 # =============================================================================
 
-def compile_patterns(patterns: list[str], flags: int = re.IGNORECASE) -> list[re.Pattern[str]]:
+
+def compile_patterns(
+    patterns: list[str], flags: int = re.IGNORECASE
+) -> list[re.Pattern[str]]:
     """Compile a list of regex patterns.
 
     Args:
@@ -199,6 +319,7 @@ def word_in_set(word: str, word_set: set[str]) -> bool:
 # SENTENCE ANALYSIS UTILITIES
 # =============================================================================
 
+
 def has_meaningful_content(text: str, min_content_words: int = 2) -> bool:
     """Check if text has meaningful content (non-stop words).
 
@@ -244,7 +365,7 @@ def has_quote(text: str) -> bool:
     Returns:
         True if quote markers found.
     """
-    quote_chars = ('"', '"', '"', "'", "'", "'")
+    quote_chars = ('"', "\u201c", "\u201d", "'", "\u2018", "\u2019")
     return any(c in text for c in quote_chars)
 
 
@@ -294,6 +415,7 @@ def has_excessive_punctuation(text: str) -> bool:
 # TEXT EXTRACTION UTILITIES
 # =============================================================================
 
+
 def extract_quoted_content(text: str) -> list[str]:
     """Extract all quoted content from text.
 
@@ -307,7 +429,7 @@ def extract_quoted_content(text: str) -> list[str]:
 
     # Double quotes (straight and curly)
     quotes.extend(re.findall(r'"([^"]+)"', text))
-    quotes.extend(re.findall(r'"([^"]+)"', text))
+    quotes.extend(re.findall("\u201c([^\u201d]+)\u201d", text))
 
     # Single quotes (only if substantial content)
     single_quotes = re.findall(r"'([^']{10,})'", text)

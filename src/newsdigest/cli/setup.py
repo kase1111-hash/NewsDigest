@@ -1,6 +1,6 @@
 """Setup command for NewsDigest CLI."""
 
-import subprocess
+import subprocess  # nosec B404 - only runs the spaCy downloader, no shell
 import sys
 from pathlib import Path
 
@@ -27,7 +27,7 @@ console = Console()
     "--config-dir",
     type=click.Path(),
     default=None,
-    help="Directory for configuration files (default: ~/.config/newsdigest).",
+    help="Directory for configuration files (default: ~/.newsdigest).",
 )
 @click.option(
     "--force",
@@ -58,10 +58,7 @@ def setup_cmd(
     console.print()
 
     # Determine config directory
-    if config_dir:
-        config_path = Path(config_dir)
-    else:
-        config_path = Path.home() / ".config" / "newsdigest"
+    config_path = Path(config_dir) if config_dir else Path.home() / ".newsdigest"
 
     steps_completed = 0
     steps_total = 3 if not skip_spacy else 2
@@ -70,26 +67,23 @@ def setup_cmd(
     if not skip_spacy:
         console.print(f"[1/{steps_total}] Downloading spaCy model: {spacy_model}")
         try:
-            result = subprocess.run(
+            result = subprocess.run(  # nosec B603 - fixed argv, no shell
                 [sys.executable, "-m", "spacy", "download", spacy_model],
                 capture_output=True,
                 text=True,
+                check=False,  # A failed download is reported below, not raised
             )
             if result.returncode == 0:
                 console.print(f"    [green]Downloaded {spacy_model}[/green]")
                 steps_completed += 1
             else:
-                console.print(
-                    "    [yellow]Warning: Failed to download model[/yellow]"
-                )
+                console.print("    [yellow]Warning: Failed to download model[/yellow]")
                 console.print(
                     f"    Run manually: python -m spacy download {spacy_model}"
                 )
         except Exception as e:
             console.print(f"    [yellow]Warning: {e}[/yellow]")
-            console.print(
-                f"    Run manually: python -m spacy download {spacy_model}"
-            )
+            console.print(f"    Run manually: python -m spacy download {spacy_model}")
     else:
         console.print("[dim]Skipping spaCy model download[/dim]")
 
@@ -107,7 +101,8 @@ def setup_cmd(
     step_num = 3 if not skip_spacy else 2
     console.print(f"[{step_num}/{steps_total}] Creating default configuration")
 
-    config_file = config_path / "config.yaml"
+    # The file Config.load() reads by default
+    config_file = config_path / "config.yml"
     if config_file.exists() and not force:
         console.print(f"    [yellow]Config exists: {config_file}[/yellow]")
         console.print("    Use --force to overwrite")
@@ -140,7 +135,7 @@ output:
 digest:
   similarity_threshold: 0.7
   min_novelty_score: 0.3
-  default_period: 24h
+  period: 24h
 """
         try:
             config_file.write_text(default_config, encoding="utf-8")
@@ -161,6 +156,4 @@ digest:
     else:
         msg = f"Setup partially complete ({steps_completed}/{steps_total} steps)"
         console.print(f"[yellow]{msg}[/yellow]")
-        console.print(
-            "Review warnings above and complete setup manually if needed."
-        )
+        console.print("Review warnings above and complete setup manually if needed.")

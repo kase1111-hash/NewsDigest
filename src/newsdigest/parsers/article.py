@@ -2,6 +2,7 @@
 
 import hashlib
 from datetime import datetime
+from typing import Any
 from urllib.parse import urlparse
 
 from newsdigest.core.article import Article, SourceType
@@ -19,7 +20,7 @@ class ArticleExtractor:
     - Extract main body text
     """
 
-    def __init__(self, config: dict | None = None) -> None:
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize article extractor.
 
         Args:
@@ -62,6 +63,10 @@ class ArticleExtractor:
         # Use metadata title if readability didn't get one
         if not title:
             title = metadata.get("title")
+
+        # The page's own headline is usually the first block of the body;
+        # it is already the title, so keep it out of the content
+        content = self._strip_leading_title(content, title)
 
         # Generate article ID
         article_id = self._generate_id(url, content)
@@ -116,6 +121,27 @@ class ArticleExtractor:
             content = self.html_cleaner.clean(html)
             return content, None
 
+    @staticmethod
+    def _strip_leading_title(content: str, title: str | None) -> str:
+        """Remove a first paragraph that repeats the title.
+
+        Args:
+            content: Extracted text, paragraphs separated by blank lines.
+            title: Article title.
+
+        Returns:
+            Content without the duplicated headline.
+        """
+        if not title:
+            return content
+        first, sep, rest = content.partition("\n\n")
+        if (
+            sep
+            and " ".join(first.split()).casefold() == " ".join(title.split()).casefold()
+        ):
+            return rest
+        return content
+
     def _generate_id(self, url: str | None, content: str) -> str:
         """Generate unique article ID.
 
@@ -126,11 +152,8 @@ class ArticleExtractor:
         Returns:
             Unique ID string.
         """
-        # Hash URL if available, otherwise hash content
-        if url:
-            hash_input = url
-        else:
-            hash_input = content[:1000]  # First 1000 chars
+        # Hash URL if available, otherwise the first 1000 chars of content
+        hash_input = url or content[:1000]
 
         return hashlib.sha256(hash_input.encode()).hexdigest()[:16]
 

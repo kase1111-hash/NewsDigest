@@ -4,11 +4,15 @@ Fetches articles from NewsAPI.org for digest generation.
 Requires: pip install newsdigest[newsapi]
 """
 
+import contextlib
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
+
+from newsdigest.utils.logging import get_logger
+
 
 try:
     from newsapi import NewsApiClient
@@ -16,7 +20,10 @@ try:
     HAS_NEWSAPI = True
 except ImportError:
     HAS_NEWSAPI = False
-    NewsApiClient = None  # type: ignore
+    NewsApiClient = None
+
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -69,9 +76,7 @@ class NewsAPIClient:
             self.config = NewsAPIConfig(api_key=api_key)
 
         if not self.config.api_key:
-            raise ValueError(
-                "NewsAPI key is required. Get one at https://newsapi.org"
-            )
+            raise ValueError("NewsAPI key is required. Get one at https://newsapi.org")
 
         self._client = httpx.AsyncClient(
             headers={"X-Api-Key": self.config.api_key},
@@ -211,7 +216,8 @@ class NewsAPIClient:
         response.raise_for_status()
 
         data = response.json()
-        return data.get("sources", [])
+        sources: list[dict[str, Any]] = data.get("sources", [])
+        return sources
 
     async def get_recent(
         self,
@@ -229,7 +235,7 @@ class NewsAPIClient:
         Returns:
             List of recent articles.
         """
-        from_date = datetime.now(timezone.utc) - timedelta(hours=hours)
+        from_date = datetime.now(UTC) - timedelta(hours=hours)
         return await self.search(query=query, from_date=from_date)
 
     def _parse_articles(
@@ -251,12 +257,10 @@ class NewsAPIClient:
             published_str = article.get("publishedAt")
             published_at = None
             if published_str:
-                try:
+                with contextlib.suppress(ValueError):
                     published_at = datetime.fromisoformat(
                         published_str.replace("Z", "+00:00")
                     )
-                except ValueError:
-                    pass
 
             result.append(
                 NewsAPIArticle(
@@ -323,12 +327,14 @@ class NewsAPIIngestor:
             category: News category.
             country: Country code.
         """
-        self._queries.append({
-            "type": "headlines",
-            "name": name,
-            "category": category,
-            "country": country,
-        })
+        self._queries.append(
+            {
+                "type": "headlines",
+                "name": name,
+                "category": category,
+                "country": country,
+            }
+        )
 
     def add_search(
         self,
@@ -343,12 +349,14 @@ class NewsAPIIngestor:
             query: Search query.
             domains: Optional domain filter.
         """
-        self._queries.append({
-            "type": "search",
-            "name": name,
-            "query": query,
-            "domains": domains,
-        })
+        self._queries.append(
+            {
+                "type": "search",
+                "name": name,
+                "query": query,
+                "domains": domains,
+            }
+        )
 
     async def fetch_all(
         self,
@@ -362,8 +370,8 @@ class NewsAPIIngestor:
         Returns:
             List of article dictionaries ready for extraction.
         """
-        all_articles = []
-        from_date = datetime.now(timezone.utc) - timedelta(hours=hours)
+        all_articles: list[dict[str, Any]] = []
+        from_date = datetime.now(UTC) - timedelta(hours=hours)
 
         for query_config in self._queries:
             try:
@@ -379,17 +387,20 @@ class NewsAPIIngestor:
                         domains=query_config.get("domains"),
                     )
 
-                for article in articles:
-                    all_articles.append({
+                all_articles.extend(
+                    {
                         "url": article.url,
                         "title": article.title,
                         "source_name": query_config["name"],
                         "published_at": article.published_at,
                         "content": article.content or article.description,
-                    })
+                    }
+                    for article in articles
+                )
 
-            except Exception:
-                # Skip failed queries, log would be added here
+            except Exception as e:
+                # Skip failed queries
+                logger.warning(f"NewsAPI query {query_config['name']!r} failed: {e}")
                 continue
 
         return all_articles

@@ -1,6 +1,7 @@
 """Quote isolator for NewsDigest."""
 
 import re
+from typing import Any
 
 from newsdigest.analyzers.base import BaseAnalyzer
 from newsdigest.core.result import RemovalReason, Sentence, SentenceCategory
@@ -29,7 +30,7 @@ class QuoteIsolator(BaseAnalyzer):
     - Paraphrase patterns
     """
 
-    def __init__(self, config: dict | None = None) -> None:
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize quote isolator."""
         super().__init__(config)
         self._attribution_patterns = [
@@ -145,7 +146,7 @@ class QuoteIsolator(BaseAnalyzer):
             True if quote found.
         """
         # Check for quotation marks
-        if '"' in text or '"' in text or '"' in text:
+        if '"' in text or "\u201c" in text or "\u201d" in text:
             return True
 
         # Check for single quotes used as quote marks
@@ -165,8 +166,18 @@ class QuoteIsolator(BaseAnalyzer):
 
         # Also check for simple attribution verbs near quotes
         attribution_verbs = [
-            "said", "says", "told", "stated", "announced", "declared",
-            "claimed", "reported", "confirmed", "denied", "added", "wrote",
+            "said",
+            "says",
+            "told",
+            "stated",
+            "announced",
+            "declared",
+            "claimed",
+            "reported",
+            "confirmed",
+            "denied",
+            "added",
+            "wrote",
         ]
         text_lower = text.lower()
         return any(verb in text_lower for verb in attribution_verbs)
@@ -186,7 +197,7 @@ class QuoteIsolator(BaseAnalyzer):
             return match.group(1).lower()
 
         # Try curly quotes
-        match = re.search(r'"([^"]+)"', text)
+        match = re.search("\u201c([^\u201d]+)\u201d", text)
         if match:
             return match.group(1).lower()
 
@@ -238,11 +249,49 @@ class QuoteIsolator(BaseAnalyzer):
             List of content words.
         """
         stop_words = {
-            "the", "a", "an", "is", "are", "was", "were", "be", "been",
-            "have", "has", "had", "do", "does", "did", "will", "would",
-            "could", "should", "to", "of", "in", "for", "on", "with", "at",
-            "by", "from", "as", "and", "but", "or", "that", "this", "it",
-            "they", "them", "he", "she", "we", "you", "said", "says",
+            "the",
+            "a",
+            "an",
+            "is",
+            "are",
+            "was",
+            "were",
+            "be",
+            "been",
+            "have",
+            "has",
+            "had",
+            "do",
+            "does",
+            "did",
+            "will",
+            "would",
+            "could",
+            "should",
+            "to",
+            "of",
+            "in",
+            "for",
+            "on",
+            "with",
+            "at",
+            "by",
+            "from",
+            "as",
+            "and",
+            "but",
+            "or",
+            "that",
+            "this",
+            "it",
+            "they",
+            "them",
+            "he",
+            "she",
+            "we",
+            "you",
+            "said",
+            "says",
         }
 
         words = text.lower().split()
@@ -253,7 +302,7 @@ class QuoteIsolator(BaseAnalyzer):
             and len(w.strip(".,!?;:'\"()-[]")) > 2
         ]
 
-    def get_quote_stats(self) -> dict:
+    def get_quote_stats(self) -> dict[str, int]:
         """Get quote statistics.
 
         Returns:
