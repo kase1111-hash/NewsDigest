@@ -1,8 +1,9 @@
 """Digest generation for NewsDigest."""
 
 import asyncio
+import re
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from newsdigest.config.settings import Config
@@ -12,6 +13,10 @@ from newsdigest.digest.clustering import TopicClusterer
 from newsdigest.digest.dedup import Deduplicator
 from newsdigest.formatters import JSONFormatter, MarkdownFormatter, TextFormatter
 from newsdigest.ingestors import RSSParser
+from newsdigest.utils.logging import get_logger
+
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -44,7 +49,7 @@ class DigestTopic:
 class Digest:
     """Complete digest output."""
 
-    generated_at: datetime = field(default_factory=datetime.utcnow)
+    generated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     period: str = "24h"
     topics: list[DigestTopic] = field(default_factory=list)
     sources_processed: int = 0
@@ -69,22 +74,40 @@ class DigestGenerator:
     6. Formats output
     """
 
-    def __init__(self, config: Config | None = None) -> None:
+    def __init__(
+        self,
+        config: Config | None = None,
+        mode: str | None = None,
+        max_items_per_source: int | None = None,
+        similarity_threshold: float | None = None,
+    ) -> None:
         """Initialize digest generator.
 
         Args:
             config: Configuration object.
+            mode: Extraction mode. Defaults to the configured mode.
+            max_items_per_source: Maximum articles taken from each feed.
+            similarity_threshold: Similarity above which articles are
+                merged as duplicates. Defaults to the configured value.
         """
         self.config = config or Config()
         self._sources: list[dict] = []
 
         # Initialize components
-        self._extractor = Extractor(config)
-        self._rss_parser = RSSParser({"fetch_full_content": True})
+        self._extractor = Extractor(self.config, mode=mode)
+        rss_config: dict[str, Any] = {
+            "fetch_full_content": True,
+            "timeout": self.config.http_timeout,
+            "retries": self.config.http_retries,
+            "requests_per_second": self.config.requests_per_second,
+        }
+        if max_items_per_source is not None:
+            rss_config["max_items"] = max_items_per_source
+        self._rss_parser = RSSParser(rss_config)
         self._clusterer = TopicClusterer()
-        self._deduplicator = Deduplicator(
-            {"similarity_threshold": self.config.digest.similarity_threshold}
-        )
+        if similarity_threshold is None:
+            similarity_threshold = self.config.digest.similarity_threshold
+        self._deduplicator = Deduplicator({"similarity_threshold": similarity_threshold})
 
         # Initialize formatters
         self._formatters = {
@@ -235,8 +258,9 @@ class DigestGenerator:
                             "source_name": source.get("name"),
                             "category": source.get("category"),
                         })
-                except Exception:
-                    # Skip failed sources
+                except Exception as e:
+                    # Skip failed sources; one bad feed shouldn't sink the digest
+                    logger.warning(f"Skipping source {source['url']}: {e}")
                     continue
 
             elif source_type == "url":
@@ -274,35 +298,34 @@ class DigestGenerator:
                     continue
 
                 results.append(result)
-            except Exception:
+            except Exception as e:
                 # Skip failed extractions
+                logger.warning(f"Skipping article that failed extraction: {e}")
                 continue
 
         return results
 
-    def _parse_period(self, period: str) -> datetime | None:
+    def _parse_period(self, period: str) -> datetime:
         """Parse period string to datetime.
 
         Args:
-            period: Period string like '24h', '7d'.
+            period: Period string like '24h', '7d', '1w'.
 
         Returns:
-            Datetime for start of period.
+            Datetime (UTC) for start of period.
+
+        Raises:
+            ValueError: If the period is not a number followed by h, d or w.
         """
-        now = datetime.utcnow()
+        match = re.fullmatch(r"\s*(\d+)\s*([hdw])\s*", period.lower())
+        if not match:
+            raise ValueError(
+                f"Invalid period: {period!r} (expected e.g. '24h', '7d' or '1w')"
+            )
 
-        # Parse period
-        if period.endswith("h"):
-            hours = int(period[:-1])
-            return now - timedelta(hours=hours)
-        elif period.endswith("d"):
-            days = int(period[:-1])
-            return now - timedelta(days=days)
-        elif period.endswith("w"):
-            weeks = int(period[:-1])
-            return now - timedelta(weeks=weeks)
-
-        return None
+        amount, unit = int(match.group(1)), match.group(2)
+        units = {"h": "hours", "d": "days", "w": "weeks"}
+        return datetime.now(UTC) - timedelta(**{units[unit]: amount})
 
     def _build_digest(
         self,

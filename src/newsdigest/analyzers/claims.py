@@ -99,9 +99,11 @@ class ClaimExtractor(BaseAnalyzer):
         if quote_claim:
             claims.append(quote_claim)
 
-        # Check for attribution claims
+        # Check for attribution claims. Each claim carries the whole sentence
+        # and its source, so an attributed statistic or quote is already
+        # covered and a second claim would just repeat it.
         attr_claim = self._extract_attribution_claim(text, sentence, index)
-        if attr_claim and not quote_claim:  # Avoid duplicating attributed quotes
+        if attr_claim and not claims:
             claims.append(attr_claim)
 
         # Check for factual claims (if no other type found)

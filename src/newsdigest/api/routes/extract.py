@@ -121,16 +121,12 @@ async def extract_content(
         Extraction response with results.
     """
     config = get_config(request)
-    extractor = Extractor(config)
+    extractor = Extractor(config, mode=body.mode.value)
 
     start_time = time.perf_counter()
 
-    # Determine if source is URL or text
-    source = body.source.strip()
-    if source.startswith(("http://", "https://")):
-        result = await extractor.extract(source)
-    else:
-        result = extractor.extract_text(source)
+    # extract() handles URLs, RSS feeds and raw text
+    result = await extractor.extract(body.source.strip())
 
     processing_time = (time.perf_counter() - start_time) * 1000
 
@@ -154,7 +150,7 @@ async def extract_batch(
         Batch extraction response with results for each source.
     """
     config = get_config(request)
-    extractor = Extractor(config)
+    extractor = Extractor(config, mode=body.mode.value)
 
     results: list[BatchResultItem] = []
     succeeded = 0
@@ -168,10 +164,7 @@ async def extract_batch(
         async with semaphore:
             start_time = time.perf_counter()
             try:
-                if source.startswith(("http://", "https://")):
-                    result = await extractor.extract(source)
-                else:
-                    result = extractor.extract_text(source)
+                result = await extractor.extract(source.strip())
 
                 processing_time = (time.perf_counter() - start_time) * 1000
                 api_result = _result_to_api(result, processing_time)

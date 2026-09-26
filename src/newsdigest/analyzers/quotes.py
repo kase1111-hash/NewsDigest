@@ -145,7 +145,7 @@ class QuoteIsolator(BaseAnalyzer):
             True if quote found.
         """
         # Check for quotation marks
-        if '"' in text or '"' in text or '"' in text:
+        if '"' in text or "\u201c" in text or "\u201d" in text:
             return True
 
         # Check for single quotes used as quote marks
@@ -186,7 +186,7 @@ class QuoteIsolator(BaseAnalyzer):
             return match.group(1).lower()
 
         # Try curly quotes
-        match = re.search(r'"([^"]+)"', text)
+        match = re.search("\u201c([^\u201d]+)\u201d", text)
         if match:
             return match.group(1).lower()
 

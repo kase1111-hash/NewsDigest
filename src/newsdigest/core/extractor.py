@@ -1,6 +1,7 @@
 """Main extraction engine for NewsDigest."""
 
 import asyncio
+import concurrent.futures
 import re
 from urllib.parse import urlparse
 
@@ -33,6 +34,9 @@ from newsdigest.utils.logging import (
 # Module logger
 logger = get_logger(__name__)
 
+# Supported extraction modes, from least to most aggressive compression
+EXTRACTION_MODES = ("conservative", "standard", "aggressive")
+
 
 class Extractor:
     """Main extraction engine that orchestrates the extraction pipeline.
@@ -48,15 +52,25 @@ class Extractor:
     def __init__(
         self,
         config: Config | None = None,
-        mode: str = "standard",
+        mode: str | None = None,
     ) -> None:
         """Initialize extractor with configuration.
 
         Args:
             config: Configuration object. Uses defaults if not provided.
             mode: Extraction mode - 'conservative', 'standard', or 'aggressive'.
+                Defaults to the configured mode (config.extraction.mode).
+
+        Raises:
+            ValueError: If mode is not a supported extraction mode.
         """
         self.config = config or Config()
+        mode = mode or self.config.extraction.mode
+        if mode not in EXTRACTION_MODES:
+            raise ValueError(
+                f"Unknown extraction mode: {mode!r} "
+                f"(expected one of: {', '.join(EXTRACTION_MODES)})"
+            )
         self.mode = mode
 
         # Build config dict for components
@@ -205,7 +219,20 @@ class Extractor:
             IngestError: If content cannot be fetched or parsed.
             ExtractionError: If content cannot be processed.
         """
-        return asyncio.run(self.extract(source))
+        try:
+            asyncio.get_running_loop()
+            in_event_loop = True
+        except RuntimeError:
+            in_event_loop = False
+
+        if not in_event_loop:
+            return asyncio.run(self.extract(source))
+
+        # asyncio.run() cannot be nested inside a running event loop (async
+        # web frameworks, Jupyter), so run the coroutine on a worker thread
+        # with its own loop. Async callers should prefer `await extract()`.
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            return pool.submit(asyncio.run, self.extract(source)).result()
 
     async def extract_batch(
         self,
@@ -510,8 +537,8 @@ class Extractor:
             1 - compressed_words / original_words if original_words > 0 else 0
         )
 
-        # Calculate densities
-        original_density = self._calculate_density(article.content, [])
+        # Calculate densities: the same claims spread over fewer words
+        original_density = self._calculate_density(article.content, claims)
         compressed_density = self._calculate_density(
             " ".join(s.text for s in kept_sentences), claims
         )
@@ -574,8 +601,9 @@ class Extractor:
             entities = re.findall(entity_pattern, text)
             claim_count = len(set(entities)) // 3  # Rough estimate
 
+        # Heuristic estimates have no confidence scores of their own
         avg_confidence = (
-            sum(c.confidence for c in claims) / claim_count if claim_count > 0 else 0.5
+            sum(c.confidence for c in claims) / len(claims) if claims else 0.5
         )
 
         raw_density = (claim_count * avg_confidence) / word_count

@@ -299,7 +299,7 @@ class TestStressConditions:
 
     def test_very_long_content(self, extractor: Extractor) -> None:
         """Handles very long content without crashing."""
-        # ~10000 words
+        # 5000 words
         long_content = "The company reported strong results. " * 1000
 
         start = time.perf_counter()
@@ -307,7 +307,7 @@ class TestStressConditions:
         elapsed = time.perf_counter() - start
 
         assert isinstance(result, ExtractionResult)
-        assert result.statistics.original_words > 5000
+        assert result.statistics.original_words == 5000
         # Should complete in reasonable time
         assert elapsed < 30, f"Very long content took {elapsed:.2f}s"
 

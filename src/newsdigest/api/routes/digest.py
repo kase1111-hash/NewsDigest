@@ -35,7 +35,12 @@ async def generate_digest(
         Digest response with generated content.
     """
     config = get_config(request)
-    generator = DigestGenerator(config=config)
+    generator = DigestGenerator(
+        config=config,
+        mode=body.mode.value,
+        max_items_per_source=body.max_articles,
+        similarity_threshold=body.cluster_threshold,
+    )
 
     # Add sources to generator
     for source in body.sources:

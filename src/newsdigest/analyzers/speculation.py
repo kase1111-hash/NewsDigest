@@ -64,6 +64,9 @@ UNCERTAINTY_PHRASES: list[str] = [
     r"observers believe",
     r"analysts say",
     r"analysts believe",
+    r"analysts suggest",
+    r"experts? (?:say|says|suggest|suggests|believe|believes)",
+    r"would appear",
 ]
 
 # Future speculation
@@ -158,7 +161,8 @@ class SpeculationStripper(BaseAnalyzer):
         Returns:
             Tuple of (speculation_score 0.0-1.0, marker_count).
         """
-        text = sentence.text.lower()
+        # Patterns use straight apostrophes; web text often has curly ones
+        text = sentence.text.lower().replace("\u2019", "'")
         words = text.split()
         word_count = len(words)
 
@@ -169,13 +173,13 @@ class SpeculationStripper(BaseAnalyzer):
         weighted_score = 0.0
 
         # Check modal verbs
-        for word in words:
+        for i, word in enumerate(words):
             # Strip punctuation for comparison
             clean_word = word.strip(".,!?;:'\"")
             if clean_word in MODAL_VERBS:
                 marker_count += 1
                 # Higher weight if near end of sentence
-                position = words.index(word) / word_count
+                position = i / word_count
                 weight = 1.0 + (position * 0.5)  # Up to 1.5x at end
                 weighted_score += weight
 
@@ -213,7 +217,7 @@ class SpeculationStripper(BaseAnalyzer):
         Returns:
             List of found speculation markers.
         """
-        text = sentence.text.lower()
+        text = sentence.text.lower().replace("\u2019", "'")
         words = text.split()
         markers = []
 

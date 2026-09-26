@@ -2,10 +2,12 @@
 
 import asyncio
 import sys
+import time
 from datetime import datetime
 
 import click
 from rich.console import Console
+from rich.markup import escape
 from rich.panel import Panel
 
 from newsdigest.config.settings import Config
@@ -66,7 +68,7 @@ def watch(
     """
     try:
         # Initialize generator
-        config = Config()
+        config = Config.load()
         generator = DigestGenerator(config=config)
 
         # Add sources
@@ -114,12 +116,12 @@ def watch(
                     "original_words": item.original_words,
                     "compressed_words": item.compressed_words,
                 }
-                console.print(json.dumps(article_dict, indent=2))
+                click.echo(json.dumps(article_dict, indent=2))
             elif output_format == "full":
                 console.print(Panel(
-                    item.summary,
-                    title=f"[bold]{item.topic or 'News'}[/bold]",
-                    subtitle=f"Sources: {', '.join(item.sources)}",
+                    escape(item.summary),
+                    title=f"[bold]{escape(item.topic or 'News')}[/bold]",
+                    subtitle=escape(f"Sources: {', '.join(item.sources)}"),
                 ))
             else:
                 # Summary format
@@ -128,9 +130,10 @@ def watch(
                     if item.original_words > 0
                     else "N/A"
                 )
+                topic = escape(f"[{item.topic or 'News'}]")
                 console.print(
-                    f"[green]+[/green] [{item.topic or 'News'}] "
-                    f"{item.summary[:100]}... ({compression} compressed)"
+                    f"[green]+[/green] {topic} "
+                    f"{escape(item.summary[:100])}... ({compression} compressed)"
                 )
 
         if once:
@@ -167,7 +170,7 @@ def watch(
                         )
 
                     # Wait for next check
-                    asyncio.run(asyncio.sleep(interval))
+                    time.sleep(interval)
 
             except KeyboardInterrupt:
                 console.print()

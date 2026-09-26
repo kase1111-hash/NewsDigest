@@ -176,14 +176,12 @@ class EnvLoader:
                 key = key.strip()
                 value = value.strip()
 
-                # Remove surrounding quotes
-                if (value.startswith('"') and value.endswith('"')) or \
-                   (value.startswith("'") and value.endswith("'")):
+                # Remove surrounding quotes; only double-quoted values
+                # interpret escape sequences (as with python-dotenv)
+                if len(value) >= 2 and value[0] == value[-1] == '"':
+                    value = value[1:-1].encode().decode("unicode_escape")
+                elif len(value) >= 2 and value[0] == value[-1] == "'":
                     value = value[1:-1]
-
-                # Handle escape sequences in double-quoted values
-                if value.startswith('"'):
-                    value = value.encode().decode("unicode_escape")
 
                 # Only set if not already in environment (don't override)
                 if key not in os.environ:
@@ -376,13 +374,20 @@ class SecretsManager:
         # Fetch from backend
         try:
             value = self._fetch_secret(key)
-            self._cache[key] = (value, time.time())
-            return SecretValue(value)
         except Exception as e:
             logger.error(f"Failed to fetch secret {key}: {e}")
             if required:
-                raise ValueError(f"Required secret {key} not found: {e}")
+                raise ValueError(f"Required secret {key} not found: {e}") from e
             return SecretValue(None)
+
+        if value is None:
+            # Not cached, so a secret added later is picked up on next lookup
+            if required:
+                raise ValueError(f"Required secret {key} not found")
+            return SecretValue(None)
+
+        self._cache[key] = (value, time.time())
+        return SecretValue(value)
 
     def _fetch_secret(self, key: str) -> str | None:
         """Fetch secret from backend.
@@ -479,7 +484,7 @@ class SecretMasker:
         self._add_pattern(r"(?i)(api[_-]?key|apikey)['\"]?\s*[:=]\s*['\"]?([a-zA-Z0-9_\-]{16,})")
         self._add_pattern(r"(?i)(secret|token|password|passwd|pwd)['\"]?\s*[:=]\s*['\"]?([^\s'\"]{8,})")
         self._add_pattern(r"(?i)(bearer\s+)([a-zA-Z0-9_\-\.]+)")
-        self._add_pattern(r"(sk-[a-zA-Z0-9]{20,})")  # OpenAI API keys
+        self._add_pattern(r"(sk-[a-zA-Z0-9_\-]{20,})")  # OpenAI keys (incl. sk-proj-)
         self._add_pattern(r"(ghp_[a-zA-Z0-9]{36,})")  # GitHub tokens
         self._add_pattern(r"(xox[baprs]-[a-zA-Z0-9\-]+)")  # Slack tokens
 

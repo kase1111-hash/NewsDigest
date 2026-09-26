@@ -1,6 +1,7 @@
 """URL fetcher for NewsDigest."""
 
 import asyncio
+import time
 from urllib.parse import urlparse
 
 import httpx
@@ -47,16 +48,34 @@ class URLFetcher(BaseIngestor):
         self._article_extractor = ArticleExtractor(config)
         self._domain_last_request: dict[str, float] = {}
         self._client: httpx.AsyncClient | None = None
+        self._client_loop: asyncio.AbstractEventLoop | None = None
 
     async def _get_client(self) -> httpx.AsyncClient:
-        """Get or create the HTTP client (connection pooling)."""
-        if self._client is None or self._client.is_closed:
+        """Get or create the HTTP client (connection pooling).
+
+        A client's connections belong to the event loop that created it, and
+        each Extractor.extract_sync() call runs a new loop, so the client is
+        recreated whenever the running loop changes.
+        """
+        loop = asyncio.get_running_loop()
+        if self._client is None or self._client.is_closed or self._client_loop is not loop:
             self._client = httpx.AsyncClient(
                 timeout=self.timeout,
                 follow_redirects=True,
                 headers={"User-Agent": self.user_agent},
+                event_hooks={"request": [self._validate_request_url]},
             )
+            self._client_loop = loop
         return self._client
+
+    @staticmethod
+    async def _validate_request_url(request: httpx.Request) -> None:
+        """Re-validate every request, including redirects.
+
+        Only the initial URL is validated by ingest(), so without this a
+        public URL could redirect to an internal address.
+        """
+        validate_url_strict(str(request.url))
 
     async def close(self) -> None:
         """Close the HTTP client."""
@@ -137,32 +156,49 @@ class URLFetcher(BaseIngestor):
         Raises:
             httpx.HTTPError: If all retries fail.
         """
+        response = await self._get_with_retry(url)
+        return response.text
+
+    async def _get_with_retry(self, url: str) -> httpx.Response:
+        """Send a GET request with retry logic.
+
+        Args:
+            url: URL to fetch.
+
+        Returns:
+            Successful response.
+
+        Raises:
+            httpx.HTTPError: If all retries fail.
+        """
         # Rate limiting per domain
         await self._rate_limit(url)
 
-        last_error = None
+        last_error: httpx.HTTPError | None = None
         client = await self._get_client()
-        for attempt in range(self.retries):
+        # "retries" counts additional attempts after the first one
+        attempts = max(0, self.retries) + 1
+        for attempt in range(attempts):
+            is_last = attempt == attempts - 1
             try:
                 response = await client.get(url)
                 response.raise_for_status()
-                return response.text
+                return response
 
             except httpx.HTTPStatusError as e:
                 last_error = e
-                if e.response.status_code == 429:
-                    # Rate limited, wait longer
-                    await asyncio.sleep(2 ** (attempt + 2))
-                elif e.response.status_code >= 500:
-                    # Server error, retry
-                    await asyncio.sleep(2**attempt)
-                else:
+                status = e.response.status_code
+                if status != 429 and status < 500:
                     # Client error, don't retry
                     raise
+                if not is_last:
+                    # Rate limited waits longer than a server error
+                    await asyncio.sleep(2 ** (attempt + 2) if status == 429 else 2**attempt)
 
             except (httpx.TimeoutException, httpx.ConnectError) as e:
                 last_error = e
-                await asyncio.sleep(2**attempt)
+                if not is_last:
+                    await asyncio.sleep(2**attempt)
 
         raise last_error or httpx.HTTPError(f"Failed to fetch {url}")
 
@@ -176,8 +212,6 @@ class URLFetcher(BaseIngestor):
             return
 
         domain = urlparse(url).netloc
-        import time
-
         current_time = time.time()
         min_interval = 1.0 / self.requests_per_second
 
@@ -189,12 +223,32 @@ class URLFetcher(BaseIngestor):
         self._domain_last_request[domain] = time.time()
 
     async def fetch_raw(self, url: str) -> str:
-        """Fetch raw HTML without parsing.
+        """Fetch raw content without parsing.
 
         Args:
             url: URL to fetch.
 
         Returns:
-            Raw HTML content.
+            Raw response body.
+
+        Raises:
+            ValidationError: If URL is invalid.
+            httpx.HTTPError: If fetch fails after retries.
         """
-        return await self._fetch_with_retry(url)
+        return await self._fetch_with_retry(validate_url_strict(url))
+
+    async def fetch_bytes(self, url: str) -> bytes:
+        """Fetch the raw response body without decoding it.
+
+        Args:
+            url: URL to fetch.
+
+        Returns:
+            Response body bytes.
+
+        Raises:
+            ValidationError: If URL is invalid.
+            httpx.HTTPError: If fetch fails after retries.
+        """
+        response = await self._get_with_retry(validate_url_strict(url))
+        return response.content

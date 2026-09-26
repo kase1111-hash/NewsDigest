@@ -109,14 +109,19 @@ class DigestRequest(BaseModel):
         default=0.7,
         ge=0.0,
         le=1.0,
-        description="Similarity threshold for clustering",
+        description="Similarity above which articles are merged as duplicates",
     )
 
 
 class CompareRequest(BaseModel):
     """Request body for content comparison."""
 
-    source: str = Field(..., description="URL or text to compare")
+    source: str = Field(
+        ...,
+        min_length=1,
+        max_length=100000,
+        description="URL or text to compare",
+    )
     mode: ExtractionMode = Field(default=ExtractionMode.STANDARD)
 
 

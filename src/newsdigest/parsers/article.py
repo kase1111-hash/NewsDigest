@@ -63,6 +63,10 @@ class ArticleExtractor:
         if not title:
             title = metadata.get("title")
 
+        # The page's own headline is usually the first block of the body;
+        # it is already the title, so keep it out of the content
+        content = self._strip_leading_title(content, title)
+
         # Generate article ID
         article_id = self._generate_id(url, content)
 
@@ -115,6 +119,24 @@ class ArticleExtractor:
             # Fall back to basic HTML cleaning
             content = self.html_cleaner.clean(html)
             return content, None
+
+    @staticmethod
+    def _strip_leading_title(content: str, title: str | None) -> str:
+        """Remove a first paragraph that repeats the title.
+
+        Args:
+            content: Extracted text, paragraphs separated by blank lines.
+            title: Article title.
+
+        Returns:
+            Content without the duplicated headline.
+        """
+        if not title:
+            return content
+        first, sep, rest = content.partition("\n\n")
+        if sep and " ".join(first.split()).casefold() == " ".join(title.split()).casefold():
+            return rest
+        return content
 
     def _generate_id(self, url: str | None, content: str) -> str:
         """Generate unique article ID.

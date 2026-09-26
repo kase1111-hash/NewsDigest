@@ -11,6 +11,7 @@ ENGAGEMENT_HOOKS: list[str] = [
     r"here'?s what you need to know",
     r"what happened next will surprise you",
     r"but that'?s not the whole story",
+    r"^but that'?s not all\b",
     r"stay tuned for more",
     r"we'?ll keep you posted",
     r"you won'?t believe",
@@ -113,7 +114,8 @@ class FillerDetector(BaseAnalyzer):
             Tuple of (is_filler, reason).
         """
         text = sentence.text.strip()
-        text_lower = text.lower()
+        # Patterns use straight apostrophes; web text often has curly ones
+        text_lower = text.lower().replace("\u2019", "'")
 
         # Check engagement hooks
         for pattern in self._engagement_patterns:
@@ -158,7 +160,7 @@ class FillerDetector(BaseAnalyzer):
         """
         count = 0
         for sentence in sentences:
-            text_lower = sentence.text.lower()
+            text_lower = sentence.text.lower().replace("\u2019", "'")
             for pattern in self._engagement_patterns:
                 if pattern.search(text_lower):
                     count += 1

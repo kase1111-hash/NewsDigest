@@ -235,13 +235,8 @@ def load_config(env: Environment | None = None) -> Config:
     # Try to load YAML config
     config_path = get_config_path(env)
 
-    if config_path.exists():
-        config = Config.from_file(config_path)
-    else:
-        # Fall back to environment variables
-        config = Config.from_env()
-
-    return config
+    # Missing file means defaults; set environment variables win either way
+    return Config.load(config_path)
 
 
 def get_environment_info() -> dict[str, Any]:

@@ -78,11 +78,35 @@ class TestURLValidationSecurity:
             "http://10.0.0.1/internal",
             "http://172.16.0.1/data",
             "http://[::1]/admin",
+            # Cloud metadata endpoint (link-local)
+            "http://169.254.169.254/latest/meta-data/",
+            # Alternative encodings of 127.0.0.1
+            "http://2130706433/",
+            "http://0x7f.0.0.1/",
+            "http://127.1/",
+            "http://[::ffff:127.0.0.1]/",
+            # Other non-public ranges and names
+            "http://0.0.0.0/",
+            "http://100.64.0.1/",
+            "http://[fd00::1]/",
+            "http://[fe80::1]/",
+            "http://service.internal/",
+            "http://LOCALHOST./",
         ]
 
         for url in private_urls:
             is_valid, error = validate_url(url, allow_private=False)
             assert is_valid is False, f"Should block private: {url}"
+
+    @pytest.mark.parametrize("url", [
+        "https://example.com/news",
+        "https://8.8.8.8/",
+        "https://1e100.net/",
+        "http://[2606:4700::1111]/",
+    ])
+    def test_allows_public_hosts(self, url: str) -> None:
+        """Public hosts and IPs are allowed."""
+        assert validate_url(url) == (True, None)
 
     def test_blocks_url_with_credentials(self) -> None:
         """URLs with embedded credentials should be handled carefully."""
@@ -165,6 +189,9 @@ class TestHTMLSanitizationSecurity:
         malicious = [
             "<scr<script>ipt>alert(1)</script>",
             "<<script>script>alert(1)<</script>/script>",
+            # Removing the inner pair must not reassemble an outer tag
+            "<scr<script></script>ipt>alert(1)</scr<script></script>ipt>",
+            "<scr\x00ipt>alert(1)</script>",
         ]
 
         for html in malicious:

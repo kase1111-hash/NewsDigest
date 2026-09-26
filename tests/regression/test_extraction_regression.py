@@ -44,7 +44,7 @@ GOLDEN_TEST_CASES = [
         the quarter, up 12% from the previous year. Net income rose 25% to
         $23.6 billion, while gross margin improved to 43.8%.
         """,
-        expect_compression=True,
+        expect_compression=False,  # Every sentence is a fact worth keeping
         expect_emotional_detection=False,
         expect_speculation_detection=False,
         expect_filler_detection=False,
@@ -234,11 +234,12 @@ class TestOutputConsistency:
         parsed = json.loads(output)
 
         # These fields should always be present
-        expected_fields = {"text", "statistics"}
+        expected_fields = {"extracted", "statistics"}
         present_fields = set(parsed.keys())
 
         for field in expected_fields:
             assert field in present_fields, f"Missing expected field: {field}"
+        assert {"text", "claims"} <= set(parsed["extracted"])
 
         # Statistics should have consistent structure
         if "statistics" in parsed:

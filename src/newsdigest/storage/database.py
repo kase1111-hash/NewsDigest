@@ -9,10 +9,12 @@ Provides persistent storage using SQLite for:
 
 import json
 import sqlite3
+import threading
 import time
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Generator
+from typing import Any
 
 from newsdigest.storage.analytics import AggregateStats, ExtractionRecord
 
@@ -36,6 +38,7 @@ class Database:
             db_path: Path to SQLite database file.
                     If None, uses in-memory database.
         """
+        self._db_path: Path | None
         if db_path:
             self._db_path = Path(db_path).expanduser()
             self._db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -43,6 +46,16 @@ class Database:
         else:
             self._db_path = None
             self._connection_string = ":memory:"
+
+        # Every connection to ":memory:" opens a separate, empty database, so
+        # an in-memory database keeps one shared connection for its lifetime.
+        self._lock = threading.RLock()
+        self._memory_conn: sqlite3.Connection | None = None
+        if self._db_path is None:
+            self._memory_conn = sqlite3.connect(
+                self._connection_string, check_same_thread=False
+            )
+            self._memory_conn.row_factory = sqlite3.Row
 
         self._initialized = False
 
@@ -53,6 +66,18 @@ class Database:
         Yields:
             SQLite connection with row factory.
         """
+        if self._db_path is None:
+            if self._memory_conn is None:
+                raise sqlite3.ProgrammingError("Cannot operate on a closed database.")
+            with self._lock:
+                try:
+                    yield self._memory_conn
+                    self._memory_conn.commit()
+                except Exception:
+                    self._memory_conn.rollback()
+                    raise
+            return
+
         conn = sqlite3.connect(self._connection_string)
         conn.row_factory = sqlite3.Row
         try:
@@ -63,6 +88,17 @@ class Database:
             raise
         finally:
             conn.close()
+
+    def close(self) -> None:
+        """Close the shared in-memory connection, discarding its data.
+
+        File-backed databases open a connection per operation, so there is
+        nothing to close for them.
+        """
+        with self._lock:
+            if self._memory_conn is not None:
+                self._memory_conn.close()
+                self._memory_conn = None
 
     def initialize(self) -> None:
         """Initialize database schema."""

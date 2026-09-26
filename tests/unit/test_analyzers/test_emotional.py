@@ -97,18 +97,49 @@ class TestEmotionalDetector:
         result = detector.analyze([sentence])
         assert result[0].removal_reason == RemovalReason.SPECULATION.value
 
-    def test_sentence_with_only_emotional_words_stays_when_removal_fails(self, detector):
-        """Test behavior when emotional words have trailing punctuation.
+    def test_sentence_with_only_emotional_words_removed(self, detector):
+        """Test that emotional words with trailing punctuation are removed.
 
-        remove_words uses \\b regex anchors which don't match after punctuation
-        like '!', so words like 'Shocking!' are not removed from the text. The
-        sentence keeps its content and stays.
+        Tokens like "Shocking!" must still match on word boundaries; once
+        they are stripped nothing meaningful remains, so the sentence goes.
         """
         sentences = [_make_sentence("Shocking! Devastating! Unprecedented!")]
         result = detector.analyze(sentences)
         assert result[0].category == SentenceCategory.EMOTIONAL
-        # The words fail to strip due to punctuation in the token, so text remains
-        assert result[0].keep is True
+        assert result[0].keep is False
+        assert result[0].removal_reason == RemovalReason.EMOTIONAL_ACTIVATION.value
+
+    @pytest.mark.parametrize("text,expected", [
+        (
+            "In a shocking development, the Federal Reserve held rates at 5.25%.",
+            "The Federal Reserve held rates at 5.25%.",
+        ),
+        ("An unprecedented rise of 40% was reported.", "A rise of 40% was reported."),
+        (
+            "Despite the shocking loss of $5 billion, the company expanded.",
+            "Despite the loss of $5 billion, the company expanded.",
+        ),
+    ])
+    def test_emotional_wrapper_removed(self, detector, text, expected):
+        """Test that lead-in clauses and adjectives go, keeping the facts."""
+        sentences = [_make_sentence(text)]
+        detector.analyze(sentences)
+        assert sentences[0].keep is True
+        assert sentences[0].text == expected
+
+    def test_direct_quotes_not_edited(self, detector):
+        """Test that emotional words inside direct quotes are preserved."""
+        text = '"This is an incredible result," Cook said.'
+        sentences = [_make_sentence(text)]
+        detector.analyze(sentences)
+        assert sentences[0].text == text
+
+    def test_reaction_only_sentence_removed(self, detector):
+        """Test that sentences only reporting a reaction are removed."""
+        sentences = [_make_sentence("The announcement sent shockwaves through markets.")]
+        detector.analyze(sentences)
+        assert sentences[0].keep is False
+        assert sentences[0].removal_reason == RemovalReason.EMOTIONAL_ACTIVATION.value
 
     def test_emotional_word_stripped_from_clean_sentence(self, detector):
         """Test that emotional words without punctuation are stripped from text."""

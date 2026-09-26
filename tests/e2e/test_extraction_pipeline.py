@@ -241,19 +241,19 @@ class TestFormatters:
     def test_json_formatter(self, extraction_result: ExtractionResult):
         """Test JSON formatter produces valid output."""
         formatter = JSONFormatter()
-        output = formatter.format(extraction_result)
+        output = formatter.format_result(extraction_result)
 
         assert isinstance(output, str)
         assert len(output) > 0
 
         # Should be valid JSON
         data = json.loads(output)
-        assert "text" in data or "content" in data or "result" in data
+        assert data["extracted"]["text"] == extraction_result.text
 
     def test_markdown_formatter(self, extraction_result: ExtractionResult):
         """Test Markdown formatter produces valid output."""
         formatter = MarkdownFormatter()
-        output = formatter.format(extraction_result)
+        output = formatter.format_result(extraction_result)
 
         assert isinstance(output, str)
         assert len(output) > 0
@@ -264,7 +264,7 @@ class TestFormatters:
     def test_text_formatter(self, extraction_result: ExtractionResult):
         """Test text formatter produces valid output."""
         formatter = TextFormatter()
-        output = formatter.format(extraction_result)
+        output = formatter.format_result(extraction_result)
 
         assert isinstance(output, str)
         assert len(output) > 0

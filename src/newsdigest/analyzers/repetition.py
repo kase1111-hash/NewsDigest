@@ -166,9 +166,12 @@ class RepetitionCollapser(BaseAnalyzer):
         parent: dict[int, int] = {idx: idx for idx in all_indices}
 
         def find(x: int) -> int:
-            if parent[x] != x:
-                parent[x] = find(parent[x])
-            return parent[x]
+            # Iterative with path halving: long runs of near-identical
+            # sentences build deep chains that overflow a recursive find.
+            while parent[x] != x:
+                parent[x] = parent[parent[x]]
+                x = parent[x]
+            return x
 
         def union(x: int, y: int) -> None:
             px, py = find(x), find(y)

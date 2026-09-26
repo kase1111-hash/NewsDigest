@@ -8,7 +8,9 @@ This module provides comprehensive input validation to ensure:
 """
 
 import html
+import ipaddress
 import re
+import socket
 from typing import Any
 from urllib.parse import urlparse
 
@@ -26,29 +28,51 @@ MAX_FEED_ITEMS = 100
 # Allowed URL schemes
 ALLOWED_SCHEMES = {"http", "https"}
 
-# Blocked domains (example malicious patterns)
-BLOCKED_DOMAIN_PATTERNS = [
-    r".*\.onion$",  # Tor hidden services
-    r"^localhost$",
-    r"^127\.\d+\.\d+\.\d+$",
-    r"^0\.0\.0\.0$",
-    r"^10\.\d+\.\d+\.\d+$",  # Private networks
-    r"^172\.(1[6-9]|2\d|3[01])\.\d+\.\d+$",
-    r"^192\.168\.\d+\.\d+$",
-]
+# Hostnames that always refer to the local machine or internal services
+BLOCKED_HOSTNAMES = {
+    "localhost",
+    "localhost.localdomain",
+    "ip6-localhost",
+    "ip6-loopback",
+    "metadata.google.internal",
+}
+BLOCKED_HOST_SUFFIXES = (".localhost", ".local", ".internal", ".onion")
 
-# Dangerous HTML patterns to remove
+# Elements whose content is executable or never article text
+DANGEROUS_TAGS = (
+    "script",
+    "style",
+    "iframe",
+    "frame",
+    "frameset",
+    "object",
+    "embed",
+    "applet",
+)
+_DANGEROUS_TAG_ALT = "|".join(DANGEROUS_TAGS)
+
+# Dangerous HTML patterns to remove. They are applied repeatedly until the
+# input stops changing, so fragments reassembled by one pass (e.g.
+# "<scr<script></script>ipt>") are caught by the next.
 DANGEROUS_HTML_PATTERNS = [
-    r"<script[^>]*>.*?</script>",
-    r"<iframe[^>]*>.*?</iframe>",
-    r"<object[^>]*>.*?</object>",
-    r"<embed[^>]*>.*?</embed>",
-    r"<applet[^>]*>.*?</applet>",
-    r"on\w+\s*=",  # Event handlers like onclick=
+    # Dangerous elements together with their content
+    rf"<({_DANGEROUS_TAG_ALT})\b[^>]*>.*?</\1\s*>",
+    # Unclosed, void (<embed>) or stray dangerous tags
+    rf"</?({_DANGEROUS_TAG_ALT})\b[^>]*>",
+    # Event handler attributes like onclick="..."
+    r"""[\s"'/]on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]*)""",
+    # Inline styles, which can run code via expression() or behavior:
+    r"""[\s"'/]style\s*=\s*("[^"]*"|'[^']*'|[^\s>]*)""",
     r"javascript:",
     r"vbscript:",
     r"data:text/html",
 ]
+_DANGEROUS_HTML_REGEXES = [
+    re.compile(p, re.IGNORECASE | re.DOTALL) for p in DANGEROUS_HTML_PATTERNS
+]
+
+# Tags (but not bare "<" / ">" used as comparison operators in prose)
+_HTML_TAG_PATTERN = re.compile(r"</?[a-zA-Z!][^<>]*>")
 
 
 # =============================================================================
@@ -80,6 +104,53 @@ class SanitizationError(ValueError):
 # =============================================================================
 # URL VALIDATION
 # =============================================================================
+
+
+def _parse_ip(host: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
+    """Parse a host as an IP address, including legacy IPv4 notations.
+
+    Resolvers accept forms such as "2130706433", "0x7f.1" or "127.1" for
+    127.0.0.1, so those must be recognised to stop them bypassing checks.
+    """
+    try:
+        return ipaddress.ip_address(host)
+    except ValueError:
+        pass
+    if re.fullmatch(r"[0-9a-fx.]+", host):
+        try:
+            return ipaddress.IPv4Address(socket.inet_aton(host))
+        except OSError:
+            return None
+    return None
+
+
+def is_private_host(hostname: str) -> bool:
+    """Check whether a hostname points at a local or non-public network.
+
+    Covers loopback, private, link-local (including cloud metadata
+    endpoints), carrier-grade NAT, reserved, multicast and unspecified
+    addresses for both IPv4 and IPv6, plus well-known local hostnames.
+    Hostnames are not resolved, so a public name whose DNS points at a
+    private address is not detected here.
+
+    Args:
+        hostname: Hostname or IP literal (without brackets or port).
+
+    Returns:
+        True if the host must not be fetched.
+    """
+    host = hostname.strip().strip("[]").rstrip(".").lower()
+    if not host:
+        return True
+    if host in BLOCKED_HOSTNAMES or host.endswith(BLOCKED_HOST_SUFFIXES):
+        return True
+
+    ip = _parse_ip(host)
+    if ip is None:
+        return False
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
+        ip = ip.ipv4_mapped
+    return not ip.is_global or ip.is_multicast
 
 
 def validate_url(url: str, allow_private: bool = False) -> tuple[bool, str | None]:
@@ -115,12 +186,9 @@ def validate_url(url: str, allow_private: bool = False) -> tuple[bool, str | Non
     if not parsed.netloc:
         return False, "URL must have a valid host"
 
-    # Check for blocked domains (unless allow_private)
-    if not allow_private:
-        hostname = parsed.hostname or ""
-        for pattern in BLOCKED_DOMAIN_PATTERNS:
-            if re.match(pattern, hostname, re.IGNORECASE):
-                return False, "URL host is not allowed (private/local network)"
+    # Check for blocked hosts (unless allow_private)
+    if not allow_private and is_private_host(parsed.hostname or ""):
+        return False, "URL host is not allowed (private/local network)"
 
     # Check for suspicious patterns
     if ".." in url or "\\" in url:
@@ -192,16 +260,12 @@ def sanitize_text(
     if max_length and len(text) > max_length:
         text = text[:max_length]
 
-    # Remove dangerous HTML patterns first
     if strip_html:
-        for pattern in DANGEROUS_HTML_PATTERNS:
-            text = re.sub(pattern, "", text, flags=re.IGNORECASE | re.DOTALL)
-
-        # Remove remaining HTML tags
-        text = re.sub(r"<[^>]+>", "", text)
-
-        # Decode HTML entities
+        # Decode entities first so encoded markup ("&lt;script&gt;") is
+        # stripped too instead of being turned back into live tags
         text = html.unescape(text)
+        text = _remove_dangerous_html(text)
+        text = _HTML_TAG_PATTERN.sub("", text)
 
     # Remove null bytes and other control characters (except newlines/tabs)
     text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", text)
@@ -235,21 +299,34 @@ def sanitize_html(html_content: str, max_length: int | None = None) -> str:
     if max_length and len(html_content) > max_length:
         html_content = html_content[:max_length]
 
-    # Remove dangerous patterns
-    for pattern in DANGEROUS_HTML_PATTERNS:
-        html_content = re.sub(pattern, "", html_content, flags=re.IGNORECASE | re.DOTALL)
-
-    # Remove null bytes
+    # Remove null bytes first so they cannot split tag names
     html_content = html_content.replace("\x00", "")
 
-    return html_content
+    return _remove_dangerous_html(html_content)
+
+
+def _remove_dangerous_html(content: str) -> str:
+    """Strip dangerous elements and attributes until none remain.
+
+    Args:
+        content: HTML or text that may contain markup.
+
+    Returns:
+        Content with dangerous markup removed.
+    """
+    previous = None
+    while previous != content:
+        previous = content
+        for regex in _DANGEROUS_HTML_REGEXES:
+            content = regex.sub(" ", content)
+    return content
 
 
 def validate_text_content(
     text: str,
     min_length: int = 0,
     max_length: int = MAX_TEXT_LENGTH,
-    require_content: bool = False,
+    require_content: bool = True,
 ) -> tuple[bool, str | None]:
     """Validate text content.
 
@@ -372,7 +449,7 @@ def validate_enum(value: Any, allowed: list[Any], name: str = "value") -> Any:
 
 
 def validate_extraction_mode(mode: str) -> str:
-    """Validate extraction mode.
+    """Validate extraction mode (how aggressively content is compressed).
 
     Args:
         mode: Mode to validate.
@@ -383,8 +460,25 @@ def validate_extraction_mode(mode: str) -> str:
     Raises:
         ValidationError: If mode is invalid.
     """
-    allowed = ["keep", "flag", "remove"]
+    allowed = ["conservative", "standard", "aggressive"]
     return validate_enum(mode, allowed, "extraction mode")
+
+
+def validate_handling_mode(mode: str, name: str = "handling mode") -> str:
+    """Validate how a content category is handled (keep, flag or remove).
+
+    Args:
+        mode: Mode to validate.
+        name: Setting name for error messages.
+
+    Returns:
+        Validated mode.
+
+    Raises:
+        ValidationError: If mode is invalid.
+    """
+    allowed = ["keep", "flag", "remove"]
+    return validate_enum(mode, allowed, name)
 
 
 # =============================================================================
@@ -483,6 +577,7 @@ def validate_article_title(title: str) -> str:
     is_valid, error = validate_text_content(
         title,
         max_length=MAX_TITLE_LENGTH,
+        require_content=False,
     )
 
     if not is_valid:

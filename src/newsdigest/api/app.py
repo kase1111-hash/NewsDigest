@@ -27,8 +27,9 @@ from newsdigest.version import __version__
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan handler."""
-    # Startup
-    app.state.config = Config()
+    # Startup: keep a config passed to create_app(), else load the user's
+    if getattr(app.state, "config", None) is None:
+        app.state.config = Config.load()
     config = app.state.config
     if config.cache_enabled:
         app.state.cache = MemoryCache(
@@ -78,9 +79,9 @@ def create_app(
         lifespan=lifespan,
     )
 
-    # Store config
-    if config:
-        app.state.config = config
+    # Store config (CORS settings below are needed before startup runs)
+    config = config or Config.load()
+    app.state.config = config
 
     # Add middleware (order matters - first added = last executed)
     # Request tracking (outermost)
@@ -95,11 +96,10 @@ def create_app(
     # CORS (innermost)
     # Note: allow_credentials=True with allow_origins=["*"] is a security risk.
     # Configure specific origins in production via config.cors_origins.
-    cors_origins = (
-        config.cors_origins
-        if config and hasattr(config, "cors_origins") and config.cors_origins
-        else ["http://localhost:3000", "http://localhost:8000"]
-    )
+    cors_origins = config.cors_origins or [
+        "http://localhost:3000",
+        "http://localhost:8000",
+    ]
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_origins,
@@ -145,7 +145,7 @@ def _register_exception_handlers(app: FastAPI) -> None:
             content=ErrorResponse(
                 error="ingest_error",
                 message=str(exc),
-                details={"source": getattr(exc, "source", None)},
+                details={"source": exc.details.get("source")},
             ).model_dump(),
         )
 

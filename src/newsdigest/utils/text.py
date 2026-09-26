@@ -9,7 +9,7 @@ import re  # noqa: I001
 
 # Punctuation characters to strip from words (deduplicated set)
 # Includes standard ASCII and common Unicode punctuation
-PUNCTUATION_CHARS = ".,!?;:'\"()-[]{}«»""''…—-"
+PUNCTUATION_CHARS = ".,!?;:'\"()-[]{}\u00ab\u00bb\u201c\u201d\u2018\u2019\u2026\u2014\u2013"
 
 
 # =============================================================================
@@ -244,7 +244,7 @@ def has_quote(text: str) -> bool:
     Returns:
         True if quote markers found.
     """
-    quote_chars = ('"', '"', '"', "'", "'", "'")
+    quote_chars = ('"', "\u201c", "\u201d", "'", "\u2018", "\u2019")
     return any(c in text for c in quote_chars)
 
 
@@ -307,7 +307,7 @@ def extract_quoted_content(text: str) -> list[str]:
 
     # Double quotes (straight and curly)
     quotes.extend(re.findall(r'"([^"]+)"', text))
-    quotes.extend(re.findall(r'"([^"]+)"', text))
+    quotes.extend(re.findall("\u201c([^\u201d]+)\u201d", text))
 
     # Single quotes (only if substantial content)
     single_quotes = re.findall(r"'([^']{10,})'", text)

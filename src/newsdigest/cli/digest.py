@@ -80,7 +80,7 @@ def digest(
     """
     try:
         # Initialize generator
-        config = Config()
+        config = Config.load()
         generator = DigestGenerator(config=config)
 
         # Load sources from config file if provided
@@ -129,7 +129,7 @@ def digest(
             if not quiet:
                 console.print(f"[green]Digest written to: {output}[/green]")
         else:
-            console.print(result)
+            click.echo(result)
 
     except DigestError as e:
         console.print(f"[red]Digest generation failed:[/red] {e}")
