@@ -88,7 +88,9 @@ def analytics(
             except (IngestError, ExtractionError) as e:
                 failed.append({"source": source, "error": str(e)})
                 if not quiet:
-                    console.print(f"[yellow]Skipped: {escape(source[:40])}... ({escape(str(e))})[/yellow]")
+                    console.print(
+                        f"[yellow]Skipped: {escape(source[:40])}... ({escape(str(e))})[/yellow]"
+                    )
 
         if not results:
             console.print("[red]No articles could be analyzed.[/red]")
@@ -107,9 +109,7 @@ def analytics(
         total_emotional = sum(
             r["result"].statistics.emotional_words_removed for r in results
         )
-        total_unnamed = sum(
-            r["result"].statistics.unnamed_sources for r in results
-        )
+        total_unnamed = sum(r["result"].statistics.unnamed_sources for r in results)
         total_named = sum(r["result"].statistics.named_sources for r in results)
 
         # Per-article stats

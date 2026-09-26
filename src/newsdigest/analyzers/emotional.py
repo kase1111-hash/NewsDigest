@@ -152,7 +152,9 @@ _REMOVED = "\x00"
 _QUOTED_SPAN = re.compile('("[^"]*"|\u201c[^\u201d]*\u201d)')
 
 # Introductory clause before the first comma: "In a shocking move, ..."
-_LEAD_CLAUSE = re.compile(r"^(?P<lead>[^,\"\u201c\u201d]{3,160}),\s+(?P<rest>\S.*)$", re.DOTALL)
+_LEAD_CLAUSE = re.compile(
+    r"^(?P<lead>[^,\"\u201c\u201d]{3,160}),\s+(?P<rest>\S.*)$", re.DOTALL
+)
 MAX_LEAD_CLAUSE_WORDS = 15
 
 
@@ -184,14 +186,18 @@ class EmotionalDetector(BaseAnalyzer):
         self.track_superlatives = self.config.get("track_superlatives", True)
 
         # Build combined word set
-        self._emotional_words = EMOTIONAL_ACTIVATION | FEAR_ANGER_WORDS | EMOTIONAL_REACTIONS
+        self._emotional_words = (
+            EMOTIONAL_ACTIVATION | FEAR_ANGER_WORDS | EMOTIONAL_REACTIONS
+        )
         self._lead_words = EMOTIONAL_ACTIVATION | EMOTIONAL_REACTIONS
         self._idiom_patterns = [re.compile(p, re.IGNORECASE) for p in EMOTIONAL_IDIOMS]
         if self.track_superlatives:
             self._emotional_words |= SUPERLATIVES
         # Words that can be cut without breaking the sentence: not reactions
         # (usually verbs) and not idioms (whole phrases)
-        self._removable_words = (self._emotional_words - EMOTIONAL_REACTIONS) | URGENCY_WORDS
+        self._removable_words = (
+            self._emotional_words - EMOTIONAL_REACTIONS
+        ) | URGENCY_WORDS
         self._urgency_patterns = [
             (word, re.compile(rf"\b{re.escape(word)}\b")) for word in URGENCY_WORDS
         ]
@@ -256,8 +262,10 @@ class EmotionalDetector(BaseAnalyzer):
         # Below the threshold only sensational adjectives go; markers like
         # [CAPS] / [PUNCTUATION] are never in the removable set
         candidates = [
-            w for w in emotional_words
-            if w in self._removable_words and (is_emotional or w in EMOTIONAL_ACTIVATION)
+            w
+            for w in emotional_words
+            if w in self._removable_words
+            and (is_emotional or w in EMOTIONAL_ACTIVATION)
         ]
         words_to_remove = [
             w for w in candidates if not self._is_named_entity_word(sentence, w)
@@ -301,7 +309,9 @@ class EmotionalDetector(BaseAnalyzer):
         if any(w[:1].isupper() and not w.isupper() for w in lead_words[1:]):
             return text, 0
 
-        hits = sum(1 for w in lead_words if strip_punctuation(w).lower() in self._lead_words)
+        hits = sum(
+            1 for w in lead_words if strip_punctuation(w).lower() in self._lead_words
+        )
         hits += sum(1 for p in self._idiom_patterns if p.search(lead))
         if hits == 0 or not has_meaningful_content(rest, min_content_words=3):
             return text, 0
@@ -433,7 +443,9 @@ class EmotionalDetector(BaseAnalyzer):
 
         # Check urgency phrases as whole words ("alert" but not "alerted")
         emotional_found.extend(
-            urgency for urgency, pattern in self._urgency_patterns if pattern.search(text)
+            urgency
+            for urgency, pattern in self._urgency_patterns
+            if pattern.search(text)
         )
 
         # Check reaction idioms ("sent shockwaves", "caught off guard")
@@ -452,9 +464,7 @@ class EmotionalDetector(BaseAnalyzer):
 
         # Calculate score
         # Base: ratio of emotional words to total words
-        emotional_count = len(
-            [w for w in emotional_found if not w.startswith("[")]
-        )
+        emotional_count = len([w for w in emotional_found if not w.startswith("[")])
         base_score = emotional_count / word_count if word_count > 0 else 0
 
         # Bonus for caps and punctuation

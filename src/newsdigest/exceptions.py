@@ -424,6 +424,7 @@ def is_retryable(exc: Exception) -> bool:
     # Network errors from httpx are retryable
     try:
         import httpx
+
         if isinstance(exc, (httpx.TimeoutException, httpx.ConnectError)):
             return True
     except ImportError:

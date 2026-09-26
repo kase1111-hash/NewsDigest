@@ -138,6 +138,7 @@ class EnvLoader:
             # Try using python-dotenv if available
             try:
                 from dotenv import load_dotenv
+
                 load_dotenv(path, override=False)
                 self._loaded_from_file = True
                 logger.debug(f"Loaded environment from {path} using python-dotenv")
@@ -159,9 +160,9 @@ class EnvLoader:
         Args:
             path: Path to .env file.
         """
-        with open(path, encoding="utf-8") as f:
-            for line_num, line in enumerate(f, 1):
-                line = line.strip()
+        with path.open(encoding="utf-8") as f:
+            for line_num, raw_line in enumerate(f, 1):
+                line = raw_line.strip()
 
                 # Skip empty lines and comments
                 if not line or line.startswith("#"):
@@ -225,7 +226,7 @@ class EnvLoader:
                 return cast(value)
             except (ValueError, TypeError) as e:
                 if required:
-                    raise ValueError(f"Failed to cast {full_key}: {e}")
+                    raise ValueError(f"Failed to cast {full_key}: {e}") from e
                 return default
 
         return value
@@ -434,12 +435,13 @@ class AWSSecretsManager(SecretsManager):
         if self._client is None:
             try:
                 import boto3
+
                 self._client = boto3.client(
                     "secretsmanager",
                     region_name=self._region,
                 )
-            except ImportError:
-                raise ImportError("boto3 is required for AWS Secrets Manager")
+            except ImportError as e:
+                raise ImportError("boto3 is required for AWS Secrets Manager") from e
         return self._client
 
     def _fetch_secret(self, key: str) -> str | None:
@@ -459,6 +461,7 @@ class AWSSecretsManager(SecretsManager):
                 return response["SecretString"]
             else:
                 import base64
+
                 return base64.b64decode(response["SecretBinary"]).decode("utf-8")
 
         except Exception as e:
@@ -481,8 +484,12 @@ class SecretMasker:
         self._patterns: list[re.Pattern] = []
 
         # Common secret patterns
-        self._add_pattern(r"(?i)(api[_-]?key|apikey)['\"]?\s*[:=]\s*['\"]?([a-zA-Z0-9_\-]{16,})")
-        self._add_pattern(r"(?i)(secret|token|password|passwd|pwd)['\"]?\s*[:=]\s*['\"]?([^\s'\"]{8,})")
+        self._add_pattern(
+            r"(?i)(api[_-]?key|apikey)['\"]?\s*[:=]\s*['\"]?([a-zA-Z0-9_\-]{16,})"
+        )
+        self._add_pattern(
+            r"(?i)(secret|token|password|passwd|pwd)['\"]?\s*[:=]\s*['\"]?([^\s'\"]{8,})"
+        )
         self._add_pattern(r"(?i)(bearer\s+)([a-zA-Z0-9_\-\.]+)")
         self._add_pattern(r"(sk-[a-zA-Z0-9_\-]{20,})")  # OpenAI keys (incl. sk-proj-)
         self._add_pattern(r"(ghp_[a-zA-Z0-9]{36,})")  # GitHub tokens
@@ -516,14 +523,12 @@ class SecretMasker:
         for secret in self._secrets:
             if secret in result:
                 # Keep first 2 and last 2 characters for identification
-                if len(secret) > 8:
-                    masked = f"{secret[:2]}****{secret[-2:]}"
-                else:
-                    masked = "****"
+                masked = f"{secret[:2]}****{secret[-2:]}" if len(secret) > 8 else "****"
                 result = result.replace(secret, masked)
 
         # Mask pattern-matched secrets
         for pattern in self._patterns:
+
             def replacer(match):
                 groups = match.groups()
                 if len(groups) >= 2:

@@ -91,8 +91,13 @@ class TestUS001ExtractContent:
         found_emotional = sum(1 for w in emotional_words if w in output_lower)
 
         # Should have fewer emotional words in output
-        original_emotional = sum(1 for w in emotional_words if w in sample_article.lower())
-        assert found_emotional < original_emotional or result.statistics.emotional_words_removed > 0
+        original_emotional = sum(
+            1 for w in emotional_words if w in sample_article.lower()
+        )
+        assert (
+            found_emotional < original_emotional
+            or result.statistics.emotional_words_removed > 0
+        )
 
     def test_ac04_speculation_removed(
         self, extractor: Extractor, sample_article: str
@@ -115,9 +120,9 @@ class TestUS001ExtractContent:
         # Named sources should be in the sources list or preserved in text
         # The article has Tim Cook as a named source
         has_named = (
-            len(result.sources_named) > 0 or
-            "Cook" in result.text or
-            result.statistics.named_sources > 0
+            len(result.sources_named) > 0
+            or "Cook" in result.text
+            or result.statistics.named_sources > 0
         )
         assert has_named
 
@@ -132,7 +137,9 @@ class TestUS001ExtractContent:
 
         # If there are warnings, check for unnamed source warnings
         if result.warnings:
-            unnamed_warnings = [w for w in result.warnings if "UNNAMED" in str(w).upper()]
+            unnamed_warnings = [
+                w for w in result.warnings if "UNNAMED" in str(w).upper()
+            ]
             # Should have warnings or track them in stats
             assert len(unnamed_warnings) >= 0 or result.statistics.unnamed_sources > 0
 
@@ -298,10 +305,10 @@ class TestUS016MarkdownOutput:
 
         # Should contain some markdown elements
         has_structure = (
-            "#" in output or  # Headers
-            "-" in output or  # Lists
-            "*" in output or  # Bold/italic/lists
-            result.text in output  # At minimum, contains the text
+            "#" in output  # Headers
+            or "-" in output  # Lists
+            or "*" in output  # Bold/italic/lists
+            or result.text in output  # At minimum, contains the text
         )
         assert has_structure
 
@@ -454,6 +461,7 @@ class TestUS031EnvironmentConfiguration:
         monkeypatch.setenv("NEWSAPI_KEY", "test-key-123")
 
         import os
+
         assert os.environ.get("NEWSAPI_KEY") == "test-key-123"
 
     def test_ac03_config_override(self, monkeypatch) -> None:

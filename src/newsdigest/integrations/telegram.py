@@ -5,9 +5,10 @@ Uses the Telegram Bot API directly (no external dependencies).
 """
 
 import asyncio
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Callable, Coroutine
+from datetime import UTC, datetime
+from typing import Any
 
 import httpx
 
@@ -176,10 +177,7 @@ class TelegramBot:
         Returns:
             True if sent successfully.
         """
-        if title:
-            text = f"*{title}*\n\n{digest_content}"
-        else:
-            text = digest_content
+        text = f"*{title}*\n\n{digest_content}" if title else digest_content
 
         message = await self.send_message(
             chat_id=chat_id,
@@ -362,10 +360,9 @@ class TelegramBot:
             return True
 
         # Check user
-        if message.from_user and message.from_user.id in self.config.allowed_users:
-            return True
-
-        return False
+        return bool(
+            message.from_user and message.from_user.id in self.config.allowed_users
+        )
 
     def _parse_message(self, data: dict[str, Any]) -> TelegramMessage | None:
         """Parse message from API response.
@@ -403,7 +400,7 @@ class TelegramBot:
 
         # Parse date
         timestamp = data.get("date", 0)
-        date = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+        date = datetime.fromtimestamp(timestamp, tz=UTC)
 
         return TelegramMessage(
             message_id=data.get("message_id", 0),

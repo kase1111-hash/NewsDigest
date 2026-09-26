@@ -166,9 +166,7 @@ class MetadataParser:
             except (json.JSONDecodeError, TypeError):
                 continue
 
-    def _extract_from_json_ld(
-        self, data: Any, metadata: dict[str, Any]
-    ) -> None:
+    def _extract_from_json_ld(self, data: Any, metadata: dict[str, Any]) -> None:
         """Extract metadata from JSON-LD object.
 
         Args:

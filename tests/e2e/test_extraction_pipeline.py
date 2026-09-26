@@ -157,9 +157,7 @@ class TestExtractionPipeline:
         categories = {s.category for s in result.sentences}
         assert len(categories) > 1  # More than one category
 
-    def test_removes_filler_content(
-        self, extractor: Extractor, news_article_text: str
-    ):
+    def test_removes_filler_content(self, extractor: Extractor, news_article_text: str):
         """Test that filler content is removed."""
         result = extractor.extract_text(news_article_text)
 
@@ -200,7 +198,7 @@ class TestFormatters:
     @pytest.fixture
     def extraction_result(self) -> ExtractionResult:
         """Create a sample extraction result."""
-        from newsdigest.core.result import (  # noqa: PLC0415
+        from newsdigest.core.result import (
             Claim,
             ClaimType,
             ExtractionStatistics,

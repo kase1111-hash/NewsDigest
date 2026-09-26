@@ -5,8 +5,6 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-
-logger = logging.getLogger(__name__)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -22,6 +20,9 @@ from newsdigest.exceptions import (
 )
 from newsdigest.storage.cache import MemoryCache
 from newsdigest.version import __version__
+
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -59,7 +60,7 @@ def create_app(
     Returns:
         Configured FastAPI application.
     """
-    from newsdigest.api.middleware import (  # noqa: PLC0415
+    from newsdigest.api.middleware import (
         AuthMiddleware,
         RateLimitMiddleware,
         RequestTrackingMiddleware,
@@ -93,9 +94,10 @@ def create_app(
     # Authentication
     app.add_middleware(AuthMiddleware, enabled=enable_auth)
 
-    # CORS (innermost)
-    # Note: allow_credentials=True with allow_origins=["*"] is a security risk.
-    # Configure specific origins in production via config.cors_origins.
+    # CORS is added last, so it runs innermost
+    # Note: allowing credentials together with a wildcard origin is a
+    # security risk, so production deployments should list their origins
+    # in the cors_origins setting (NEWSDIGEST_CORS_ORIGINS).
     cors_origins = config.cors_origins or [
         "http://localhost:3000",
         "http://localhost:8000",
@@ -137,9 +139,7 @@ def _register_exception_handlers(app: FastAPI) -> None:
         )
 
     @app.exception_handler(IngestError)
-    async def ingest_error_handler(
-        request: Request, exc: IngestError
-    ) -> JSONResponse:
+    async def ingest_error_handler(request: Request, exc: IngestError) -> JSONResponse:
         return JSONResponse(
             status_code=422,
             content=ErrorResponse(
@@ -162,9 +162,7 @@ def _register_exception_handlers(app: FastAPI) -> None:
         )
 
     @app.exception_handler(DigestError)
-    async def digest_error_handler(
-        request: Request, exc: DigestError
-    ) -> JSONResponse:
+    async def digest_error_handler(request: Request, exc: DigestError) -> JSONResponse:
         return JSONResponse(
             status_code=422,
             content=ErrorResponse(
@@ -186,9 +184,7 @@ def _register_exception_handlers(app: FastAPI) -> None:
         )
 
     @app.exception_handler(Exception)
-    async def generic_error_handler(
-        request: Request, exc: Exception
-    ) -> JSONResponse:
+    async def generic_error_handler(request: Request, exc: Exception) -> JSONResponse:
         # Log the exception with full traceback for debugging
         logger.exception(
             "Unexpected error during request to %s: %s",

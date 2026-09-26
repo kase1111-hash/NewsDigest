@@ -48,9 +48,7 @@ class NoveltyScorer(BaseAnalyzer):
                 continue
 
             # Calculate novelty based on new information
-            novelty = self._calculate_novelty(
-                sentence, seen_entities, seen_terms, i
-            )
+            novelty = self._calculate_novelty(sentence, seen_entities, seen_terms, i)
             sentence.novelty_score = novelty
 
             # Update seen information
@@ -102,10 +100,7 @@ class NoveltyScorer(BaseAnalyzer):
 
         # Combine scores
         combined = (
-            entity_novelty * 0.4 +
-            term_novelty * 0.4 +
-            number_bonus +
-            quote_bonus
+            entity_novelty * 0.4 + term_novelty * 0.4 + number_bonus + quote_bonus
         )
 
         # Apply position decay (later sentences get small penalty)
@@ -114,9 +109,7 @@ class NoveltyScorer(BaseAnalyzer):
 
         return round(min(1.0, max(0.0, combined)), 2)
 
-    def _entity_novelty(
-        self, sentence: Sentence, seen_entities: set[str]
-    ) -> float:
+    def _entity_novelty(self, sentence: Sentence, seen_entities: set[str]) -> float:
         """Calculate novelty based on entities.
 
         Args:
@@ -177,17 +170,101 @@ class NoveltyScorer(BaseAnalyzer):
             List of content terms.
         """
         stop_words = {
-            "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-            "have", "has", "had", "do", "does", "did", "will", "would", "could",
-            "should", "may", "might", "must", "shall", "can", "to", "of", "in",
-            "for", "on", "with", "at", "by", "from", "as", "into", "through",
-            "during", "before", "after", "above", "below", "between", "under",
-            "again", "further", "then", "once", "and", "but", "or", "nor", "so",
-            "yet", "both", "either", "neither", "not", "only", "own", "same",
-            "than", "too", "very", "just", "also", "that", "this", "these",
-            "those", "it", "its", "they", "their", "them", "he", "she", "his",
-            "her", "him", "we", "our", "us", "you", "your", "who", "which",
-            "what", "when", "where", "why", "how", "said", "says", "told",
+            "the",
+            "a",
+            "an",
+            "is",
+            "are",
+            "was",
+            "were",
+            "be",
+            "been",
+            "being",
+            "have",
+            "has",
+            "had",
+            "do",
+            "does",
+            "did",
+            "will",
+            "would",
+            "could",
+            "should",
+            "may",
+            "might",
+            "must",
+            "shall",
+            "can",
+            "to",
+            "of",
+            "in",
+            "for",
+            "on",
+            "with",
+            "at",
+            "by",
+            "from",
+            "as",
+            "into",
+            "through",
+            "during",
+            "before",
+            "after",
+            "above",
+            "below",
+            "between",
+            "under",
+            "again",
+            "further",
+            "then",
+            "once",
+            "and",
+            "but",
+            "or",
+            "nor",
+            "so",
+            "yet",
+            "both",
+            "either",
+            "neither",
+            "not",
+            "only",
+            "own",
+            "same",
+            "than",
+            "too",
+            "very",
+            "just",
+            "also",
+            "that",
+            "this",
+            "these",
+            "those",
+            "it",
+            "its",
+            "they",
+            "their",
+            "them",
+            "he",
+            "she",
+            "his",
+            "her",
+            "him",
+            "we",
+            "our",
+            "us",
+            "you",
+            "your",
+            "who",
+            "which",
+            "what",
+            "when",
+            "where",
+            "why",
+            "how",
+            "said",
+            "says",
+            "told",
         }
 
         words = text.lower().split()

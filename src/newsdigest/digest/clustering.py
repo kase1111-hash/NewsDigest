@@ -1,6 +1,7 @@
 """Topic clustering for NewsDigest."""
 
 import re
+from typing import ClassVar
 
 from newsdigest.core.result import ExtractionResult
 
@@ -13,7 +14,7 @@ class TopicClusterer:
     """
 
     # Topic definitions with keywords and emoji
-    TOPICS: list[tuple[str, str, set[str]]] = [
+    TOPICS: ClassVar[list[tuple[str, str, set[str]]]] = [
         (
             "World",
             "🌍",
@@ -283,7 +284,7 @@ class TopicClusterer:
         """
         # Combine title and text for analysis
         content = f"{article.title or ''} {article.text}".lower()
-        words = set(re.findall(r'\b\w+\b', content))
+        words = set(re.findall(r"\b\w+\b", content))
 
         # Score each topic
         scores: dict[str, int] = {}

@@ -16,7 +16,7 @@ from collections.abc import Callable
 from contextlib import contextmanager
 from datetime import datetime
 from functools import wraps
-from typing import Any, TypeVar
+from typing import Any, ClassVar, TypeVar
 
 
 # Type variable for decorator
@@ -27,14 +27,11 @@ F = TypeVar("F", bound=Callable[..., Any])
 # =============================================================================
 
 # Default log format
-DEFAULT_FORMAT = (
-    "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
-)
+DEFAULT_FORMAT = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
 
 # Detailed format with more context
 DETAILED_FORMAT = (
-    "%(asctime)s | %(levelname)-8s | %(name)s:%(lineno)d | "
-    "%(funcName)s | %(message)s"
+    "%(asctime)s | %(levelname)-8s | %(name)s:%(lineno)d | %(funcName)s | %(message)s"
 )
 
 # JSON format template
@@ -64,11 +61,11 @@ LOGGER_NAME = "newsdigest"
 class ColoredFormatter(logging.Formatter):
     """Formatter that adds colors to log levels for terminal output."""
 
-    COLORS = {
-        "DEBUG": "\033[36m",     # Cyan
-        "INFO": "\033[32m",      # Green
-        "WARNING": "\033[33m",   # Yellow
-        "ERROR": "\033[31m",     # Red
+    COLORS: ClassVar[dict[str, str]] = {
+        "DEBUG": "\033[36m",  # Cyan
+        "INFO": "\033[32m",  # Green
+        "WARNING": "\033[33m",  # Yellow
+        "ERROR": "\033[31m",  # Red
         "CRITICAL": "\033[35m",  # Magenta
     }
     RESET = "\033[0m"
@@ -78,9 +75,7 @@ class ColoredFormatter(logging.Formatter):
         # Add color to levelname
         levelname = record.levelname
         if levelname in self.COLORS:
-            record.levelname = (
-                f"{self.COLORS[levelname]}{levelname}{self.RESET}"
-            )
+            record.levelname = f"{self.COLORS[levelname]}{levelname}{self.RESET}"
 
         result = super().format(record)
 
@@ -267,15 +262,11 @@ def log_performance(logger: logging.Logger | None = None) -> Callable[[F], F]:
             try:
                 result = func(*args, **kwargs)
                 elapsed = time.perf_counter() - start_time
-                logger.debug(
-                    f"{func.__name__} completed in {elapsed:.3f}s"
-                )
+                logger.debug(f"{func.__name__} completed in {elapsed:.3f}s")
                 return result
             except Exception as e:
                 elapsed = time.perf_counter() - start_time
-                logger.error(
-                    f"{func.__name__} failed after {elapsed:.3f}s: {e}"
-                )
+                logger.error(f"{func.__name__} failed after {elapsed:.3f}s: {e}")
                 raise
 
         @wraps(func)
@@ -284,18 +275,15 @@ def log_performance(logger: logging.Logger | None = None) -> Callable[[F], F]:
             try:
                 result = await func(*args, **kwargs)
                 elapsed = time.perf_counter() - start_time
-                logger.debug(
-                    f"{func.__name__} completed in {elapsed:.3f}s"
-                )
+                logger.debug(f"{func.__name__} completed in {elapsed:.3f}s")
                 return result
             except Exception as e:
                 elapsed = time.perf_counter() - start_time
-                logger.error(
-                    f"{func.__name__} failed after {elapsed:.3f}s: {e}"
-                )
+                logger.error(f"{func.__name__} failed after {elapsed:.3f}s: {e}")
                 raise
 
         import asyncio
+
         if asyncio.iscoroutinefunction(func):
             return async_wrapper  # type: ignore
         return wrapper  # type: ignore
@@ -336,10 +324,7 @@ class LoggedOperation:
         """Enter context - log start."""
         self.start_time = time.perf_counter()
         context_str = " ".join(f"{k}={v}" for k, v in self.context.items())
-        self.logger.log(
-            self.level,
-            f"Starting: {self.operation} {context_str}".strip()
-        )
+        self.logger.log(self.level, f"Starting: {self.operation} {context_str}".strip())
         return self
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
@@ -350,7 +335,7 @@ class LoggedOperation:
         if exc_type is None:
             self.logger.log(
                 self.level,
-                f"Completed: {self.operation} in {elapsed:.3f}s {context_str}".strip()
+                f"Completed: {self.operation} in {elapsed:.3f}s {context_str}".strip(),
             )
         else:
             self.logger.error(
@@ -397,9 +382,7 @@ def log_extraction_complete(
         claims_count: Number of claims extracted.
     """
     compression = (
-        (1 - compressed_words / original_words) * 100
-        if original_words > 0
-        else 0
+        (1 - compressed_words / original_words) * 100 if original_words > 0 else 0
     )
     display_source = source[:50] + "..." if len(source) > 50 else source
     logger.info(

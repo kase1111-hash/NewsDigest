@@ -118,8 +118,9 @@ class TestSingleExtractionPerformance:
         elapsed = time.perf_counter() - start
 
         assert isinstance(result, ExtractionResult)
-        assert elapsed < MAX_SINGLE_EXTRACTION_TIME, \
+        assert elapsed < MAX_SINGLE_EXTRACTION_TIME, (
             f"Extraction took {elapsed:.2f}s, max allowed is {MAX_SINGLE_EXTRACTION_TIME}s"
+        )
 
     def test_large_article_speed(
         self, extractor: Extractor, large_article: str
@@ -130,13 +131,14 @@ class TestSingleExtractionPerformance:
         elapsed = time.perf_counter() - start
 
         assert isinstance(result, ExtractionResult)
-        assert elapsed < MAX_LARGE_CONTENT_TIME, \
+        assert elapsed < MAX_LARGE_CONTENT_TIME, (
             f"Large content took {elapsed:.2f}s, max allowed is {MAX_LARGE_CONTENT_TIME}s"
+        )
 
     def test_empty_content_fast(self, extractor: Extractor) -> None:
         """Empty content processes quickly."""
         start = time.perf_counter()
-        result = extractor.extract_sync("")
+        extractor.extract_sync("")
         elapsed = time.perf_counter() - start
 
         assert elapsed < 1.0, f"Empty content took {elapsed:.2f}s"
@@ -144,7 +146,7 @@ class TestSingleExtractionPerformance:
     def test_short_content_fast(self, extractor: Extractor) -> None:
         """Short content processes quickly."""
         start = time.perf_counter()
-        result = extractor.extract_sync("Apple reported earnings.")
+        extractor.extract_sync("Apple reported earnings.")
         elapsed = time.perf_counter() - start
 
         assert elapsed < 2.0, f"Short content took {elapsed:.2f}s"
@@ -163,8 +165,9 @@ class TestSingleExtractionPerformance:
         max_deviation = max(abs(t - avg_time) for t in times)
 
         # Deviation should be less than 50% of average
-        assert max_deviation < avg_time * 0.5, \
+        assert max_deviation < avg_time * 0.5, (
             f"Timing inconsistent: times={times}, avg={avg_time:.2f}s"
+        )
 
 
 # =============================================================================
@@ -187,8 +190,9 @@ class TestBatchPerformance:
         articles_processed = len(results)
         throughput = articles_processed / elapsed
 
-        assert throughput >= MIN_BATCH_THROUGHPUT, \
+        assert throughput >= MIN_BATCH_THROUGHPUT, (
             f"Throughput {throughput:.2f} articles/s below minimum {MIN_BATCH_THROUGHPUT}"
+        )
 
     @pytest.mark.asyncio
     async def test_batch_time_per_article(
@@ -196,13 +200,14 @@ class TestBatchPerformance:
     ) -> None:
         """Average time per article in batch is acceptable."""
         start = time.perf_counter()
-        results = await extractor.extract_batch(batch_articles, parallel=True)
+        await extractor.extract_batch(batch_articles, parallel=True)
         elapsed = time.perf_counter() - start
 
         time_per_article = elapsed / len(batch_articles)
 
-        assert time_per_article < MAX_BATCH_TIME_PER_ARTICLE, \
+        assert time_per_article < MAX_BATCH_TIME_PER_ARTICLE, (
             f"Time per article {time_per_article:.2f}s exceeds max {MAX_BATCH_TIME_PER_ARTICLE}s"
+        )
 
     @pytest.mark.asyncio
     async def test_parallel_faster_than_sequential(
@@ -221,14 +226,17 @@ class TestBatchPerformance:
 
         # Parallel should not be significantly slower
         # (may not be faster for small batches due to overhead)
-        assert parallel_time < sequential_time * 1.5, \
+        assert parallel_time < sequential_time * 1.5, (
             f"Parallel ({parallel_time:.2f}s) much slower than sequential ({sequential_time:.2f}s)"
+        )
 
     @pytest.mark.asyncio
     async def test_large_batch_completes(self, extractor: Extractor) -> None:
         """Large batch completes without timeout."""
         # Create 20 articles
-        articles = ["Article about topic " + str(i) + ". Facts and details." for i in range(20)]
+        articles = [
+            "Article about topic " + str(i) + ". Facts and details." for i in range(20)
+        ]
 
         start = time.perf_counter()
         results = await extractor.extract_batch(articles, parallel=True, max_workers=5)
@@ -314,7 +322,9 @@ class TestStressConditions:
     def test_many_sentences(self, extractor: Extractor) -> None:
         """Handles content with many sentences."""
         # 500 sentences
-        many_sentences = ". ".join([f"Sentence number {i} with some content" for i in range(500)])
+        many_sentences = ". ".join(
+            [f"Sentence number {i} with some content" for i in range(500)]
+        )
 
         start = time.perf_counter()
         result = extractor.extract_sync(many_sentences)
@@ -325,10 +335,13 @@ class TestStressConditions:
 
     def test_complex_unicode(self, extractor: Extractor) -> None:
         """Handles complex unicode content efficiently."""
-        unicode_content = """
+        unicode_content = (
+            """
         日本語のテキスト。中文文本。한국어 텍스트。
         Ελληνικά κείμενο. Русский текст. العربية النص.
-        """ * 50
+        """
+            * 50
+        )
 
         start = time.perf_counter()
         result = extractor.extract_sync(unicode_content)
@@ -339,12 +352,15 @@ class TestStressConditions:
 
     def test_special_characters_heavy(self, extractor: Extractor) -> None:
         """Handles content heavy with special characters."""
-        special_content = """
+        special_content = (
+            """
         Price: $100.50 (€90.25 / £80.00) @ 15% discount!!!
         Email: test@example.com | Phone: +1-555-0123
         URL: https://example.com/path?query=value&other=123
         Math: 2^10 = 1024, √16 = 4, π ≈ 3.14159
-        """ * 50
+        """
+            * 50
+        )
 
         start = time.perf_counter()
         result = extractor.extract_sync(special_content)
@@ -386,7 +402,7 @@ class TestMemoryUsage:
         # Get baseline (approximate)
         # Note: This is a simple heuristic, not precise memory measurement
         results = []
-        for i in range(10):
+        for _i in range(10):
             result = extractor.extract_sync(content)
             results.append(result)
 
@@ -396,11 +412,14 @@ class TestMemoryUsage:
     def test_large_result_memory(self, extractor: Extractor) -> None:
         """Large results don't cause memory issues."""
         # Create content that will produce large result
-        large_content = """
+        large_content = (
+            """
         Apple reported $90 billion revenue. CEO Tim Cook announced.
         Google reported $75 billion revenue. CEO Sundar Pichai commented.
         Microsoft reported $60 billion revenue. CEO Satya Nadella stated.
-        """ * 100
+        """
+            * 100
+        )
 
         result = extractor.extract_sync(large_content)
 
@@ -437,7 +456,9 @@ class TestBenchmarkBaselines:
         max_time = max(times)
 
         # Log baseline (would be captured by test output)
-        print(f"\nExtraction baseline: avg={avg_time:.3f}s, min={min_time:.3f}s, max={max_time:.3f}s")
+        print(
+            f"\nExtraction baseline: avg={avg_time:.3f}s, min={min_time:.3f}s, max={max_time:.3f}s"
+        )
 
         # Verify reasonable performance
         assert avg_time < 5.0, f"Baseline too slow: {avg_time:.3f}s"
@@ -456,6 +477,8 @@ class TestBenchmarkBaselines:
         avg_time = sum(times) / len(times)
         throughput = 10 / avg_time
 
-        print(f"\nBatch baseline: avg={avg_time:.3f}s, throughput={throughput:.2f} articles/s")
+        print(
+            f"\nBatch baseline: avg={avg_time:.3f}s, throughput={throughput:.2f} articles/s"
+        )
 
         assert throughput > 0.5, f"Batch throughput too low: {throughput:.2f}"

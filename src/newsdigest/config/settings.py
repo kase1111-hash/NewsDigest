@@ -145,7 +145,9 @@ class Config(BaseModel):
         return cls(**cls._read_file(path))
 
     @classmethod
-    def load(cls, path: str | Path | None = None, prefix: str = "NEWSDIGEST_") -> "Config":
+    def load(
+        cls, path: str | Path | None = None, prefix: str = "NEWSDIGEST_"
+    ) -> "Config":
         """Load user configuration: the config file, then environment overrides.
 
         The file is `path`, else ``$NEWSDIGEST_CONFIG``, else
@@ -176,7 +178,7 @@ class Config(BaseModel):
         Returns:
             Configuration mapping, or an empty dict if the file is missing.
         """
-        import yaml  # noqa: PLC0415
+        import yaml
 
         path = Path(path).expanduser()
         if not path.exists():

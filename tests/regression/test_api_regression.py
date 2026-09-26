@@ -376,14 +376,17 @@ class TestExceptionAPIRegression:
         ]
 
         for exc in exceptions:
-            assert issubclass(exc, NewsDigestError), \
+            assert issubclass(exc, NewsDigestError), (
                 f"{exc.__name__} should inherit from NewsDigestError"
+            )
 
     def test_exception_attributes(self) -> None:
         """Exceptions have expected attributes."""
         from newsdigest.exceptions import NewsDigestError
 
-        exc = NewsDigestError("Test error", cause=ValueError("cause"), details={"key": "value"})
+        exc = NewsDigestError(
+            "Test error", cause=ValueError("cause"), details={"key": "value"}
+        )
 
         assert hasattr(exc, "message")
         assert hasattr(exc, "cause")

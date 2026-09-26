@@ -2,6 +2,7 @@
 
 import hashlib
 import re
+from pathlib import Path
 
 from newsdigest.core.article import Article, SourceType
 from newsdigest.ingestors.base import BaseIngestor
@@ -132,8 +133,7 @@ class TextIngestor(BaseIngestor):
         Raises:
             FileNotFoundError: If file doesn't exist.
         """
-        with open(file_path, encoding="utf-8") as f:
-            content = f.read()
+        content = Path(file_path).read_text(encoding="utf-8")
 
         return self.from_text(content, source_name=file_path)
 

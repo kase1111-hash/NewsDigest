@@ -28,10 +28,13 @@ def runner(monkeypatch, tmp_path) -> CliRunner:
 class TestCLIOutput:
     """Tests for machine-readable and markup-safe output."""
 
-    @pytest.mark.parametrize("command", [
-        ["extract", "-q", "-f", "json"],
-        ["stats", "-q", "-f", "json"],
-    ])
+    @pytest.mark.parametrize(
+        "command",
+        [
+            ["extract", "-q", "-f", "json"],
+            ["stats", "-q", "-f", "json"],
+        ],
+    )
     def test_json_output_is_valid(self, runner, command):
         """Test JSON output isn't hard-wrapped by the terminal renderer."""
         result = runner.invoke(cli, [*command, LONG_ARTICLE])
@@ -45,11 +48,14 @@ class TestCLIOutput:
         data = json.loads(result.output)
         assert "$89.5 billion" in data["extracted"]["text"]
 
-    @pytest.mark.parametrize("command", [
-        ["extract", "-q"],
-        ["compare", "-q"],
-        ["sources", "-q"],
-    ])
+    @pytest.mark.parametrize(
+        "command",
+        [
+            ["extract", "-q"],
+            ["compare", "-q"],
+            ["sources", "-q"],
+        ],
+    )
     def test_markup_like_text_is_printed_literally(self, runner, command):
         """Test "[/quote]"-style text neither crashes nor gets swallowed."""
         text = "Officials said the [bold] plan [/quote] costs $5 billion in total."
@@ -67,7 +73,9 @@ class TestCLIOutput:
         text = "The dangerous storm hit the Florida coast on Monday, officials said."
 
         configured = runner.invoke(cli, ["extract", "-q", "-f", "json", text])
-        explicit = runner.invoke(cli, ["extract", "-q", "-f", "json", "-m", "standard", text])
+        explicit = runner.invoke(
+            cli, ["extract", "-q", "-f", "json", "-m", "standard", text]
+        )
 
         assert "dangerous" not in json.loads(configured.output)["extracted"]["text"]
         assert "dangerous" in json.loads(explicit.output)["extracted"]["text"]

@@ -99,10 +99,7 @@ def compare(
             table.add_column("Reason", width=20)
 
             for sentence in result.sentences:
-                if sentence.keep:
-                    status = "[green]KEEP[/green]"
-                else:
-                    status = "[red]REMOVE[/red]"
+                status = "[green]KEEP[/green]" if sentence.keep else "[red]REMOVE[/red]"
                 reason = sentence.removal_reason or "-"
                 txt = sentence.text
                 text = txt[:100] + "..." if len(txt) > 100 else txt

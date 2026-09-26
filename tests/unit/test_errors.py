@@ -1,6 +1,5 @@
 """Tests for error reporting utilities."""
 
-
 import pytest
 
 from newsdigest.exceptions import ExtractionError
@@ -192,6 +191,7 @@ class TestCaptureErrorsDecorator:
 
     def test_decorator_reraises_by_default(self):
         """Test that decorator re-raises exceptions by default."""
+
         @capture_errors()
         def failing_function():
             raise ValueError("Test error")
@@ -201,6 +201,7 @@ class TestCaptureErrorsDecorator:
 
     def test_decorator_no_reraise(self):
         """Test decorator with reraise=False."""
+
         @capture_errors(reraise=False)
         def failing_function():
             raise ValueError("Test error")
@@ -211,6 +212,7 @@ class TestCaptureErrorsDecorator:
 
     def test_decorator_on_success(self):
         """Test decorator on successful function."""
+
         @capture_errors()
         def successful_function():
             return "success"
@@ -221,6 +223,7 @@ class TestCaptureErrorsDecorator:
     @pytest.mark.asyncio
     async def test_decorator_async_function(self):
         """Test decorator on async function."""
+
         @capture_errors()
         async def async_failing():
             raise ValueError("Async error")
@@ -231,6 +234,7 @@ class TestCaptureErrorsDecorator:
     @pytest.mark.asyncio
     async def test_decorator_async_success(self):
         """Test decorator on successful async function."""
+
         @capture_errors()
         async def async_success():
             return "async success"
@@ -362,12 +366,12 @@ class TestGlobalFunctions:
             raise ValueError("Test")
         except Exception as e:
             # Should not raise
-            result = capture_exception(e)
+            capture_exception(e)
 
     def test_capture_message_global(self):
         """Test global capture_message."""
         # Should not raise
-        result = capture_message("Test message")
+        capture_message("Test message")
 
     def test_add_breadcrumb_global(self):
         """Test global add_breadcrumb."""

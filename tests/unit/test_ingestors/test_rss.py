@@ -58,7 +58,7 @@ class TestRSSParser:
 
     async def test_internal_feed_url_rejected(self) -> None:
         """Test feed URLs pointing at internal hosts are refused."""
-        from newsdigest.utils.validation import ValidationError  # noqa: PLC0415
+        from newsdigest.utils.validation import ValidationError
 
         with pytest.raises(ValidationError):
             await RSSParser().parse("http://127.0.0.1:8080/feed.xml")

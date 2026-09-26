@@ -118,11 +118,13 @@ def watch(
                 }
                 click.echo(json.dumps(article_dict, indent=2))
             elif output_format == "full":
-                console.print(Panel(
-                    escape(item.summary),
-                    title=f"[bold]{escape(item.topic or 'News')}[/bold]",
-                    subtitle=escape(f"Sources: {', '.join(item.sources)}"),
-                ))
+                console.print(
+                    Panel(
+                        escape(item.summary),
+                        title=f"[bold]{escape(item.topic or 'News')}[/bold]",
+                        subtitle=escape(f"Sources: {', '.join(item.sources)}"),
+                    )
+                )
             else:
                 # Summary format
                 compression = (

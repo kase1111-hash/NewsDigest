@@ -4,11 +4,13 @@ Fetches tweets and threads from Twitter/X for analysis.
 Requires: pip install newsdigest[twitter]
 """
 
+import contextlib
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
 import httpx
+
 
 try:
     import tweepy
@@ -291,12 +293,10 @@ class TwitterClient:
             created_str = tweet.get("created_at")
             created_at = None
             if created_str:
-                try:
+                with contextlib.suppress(ValueError):
                     created_at = datetime.fromisoformat(
                         created_str.replace("Z", "+00:00")
                     )
-                except ValueError:
-                    pass
 
             # Get metrics
             metrics = tweet.get("public_metrics", {})
@@ -381,11 +381,13 @@ class TwitterIngestor:
             username: Twitter username (without @).
             name: Display name for the source.
         """
-        self._sources.append({
-            "type": "user",
-            "username": username,
-            "name": name or f"@{username}",
-        })
+        self._sources.append(
+            {
+                "type": "user",
+                "username": username,
+                "name": name or f"@{username}",
+            }
+        )
 
     def add_search(self, name: str, query: str) -> None:
         """Add a search query.
@@ -394,11 +396,13 @@ class TwitterIngestor:
             name: Display name for the source.
             query: Twitter search query.
         """
-        self._sources.append({
-            "type": "search",
-            "name": name,
-            "query": query,
-        })
+        self._sources.append(
+            {
+                "type": "search",
+                "name": name,
+                "query": query,
+            }
+        )
 
     async def fetch_all(self, max_per_source: int = 50) -> list[dict[str, Any]]:
         """Fetch tweets from all configured sources.
@@ -424,8 +428,8 @@ class TwitterIngestor:
                         max_results=max_per_source,
                     )
 
-                for tweet in tweets:
-                    all_tweets.append({
+                all_tweets.extend(
+                    {
                         "url": tweet.url,
                         "text": tweet.text,
                         "source_name": source["name"],
@@ -436,7 +440,9 @@ class TwitterIngestor:
                             "retweets": tweet.retweet_count,
                             "replies": tweet.reply_count,
                         },
-                    })
+                    }
+                    for tweet in tweets
+                )
 
             except Exception:
                 # Skip failed sources

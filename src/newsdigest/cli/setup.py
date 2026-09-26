@@ -58,10 +58,7 @@ def setup_cmd(
     console.print()
 
     # Determine config directory
-    if config_dir:
-        config_path = Path(config_dir)
-    else:
-        config_path = Path.home() / ".newsdigest"
+    config_path = Path(config_dir) if config_dir else Path.home() / ".newsdigest"
 
     steps_completed = 0
     steps_total = 3 if not skip_spacy else 2
@@ -74,22 +71,19 @@ def setup_cmd(
                 [sys.executable, "-m", "spacy", "download", spacy_model],
                 capture_output=True,
                 text=True,
+                check=False,  # A failed download is reported below, not raised
             )
             if result.returncode == 0:
                 console.print(f"    [green]Downloaded {spacy_model}[/green]")
                 steps_completed += 1
             else:
-                console.print(
-                    "    [yellow]Warning: Failed to download model[/yellow]"
-                )
+                console.print("    [yellow]Warning: Failed to download model[/yellow]")
                 console.print(
                     f"    Run manually: python -m spacy download {spacy_model}"
                 )
         except Exception as e:
             console.print(f"    [yellow]Warning: {e}[/yellow]")
-            console.print(
-                f"    Run manually: python -m spacy download {spacy_model}"
-            )
+            console.print(f"    Run manually: python -m spacy download {spacy_model}")
     else:
         console.print("[dim]Skipping spaCy model download[/dim]")
 
@@ -162,6 +156,4 @@ digest:
     else:
         msg = f"Setup partially complete ({steps_completed}/{steps_total} steps)"
         console.print(f"[yellow]{msg}[/yellow]")
-        console.print(
-            "Review warnings above and complete setup manually if needed."
-        )
+        console.print("Review warnings above and complete setup manually if needed.")

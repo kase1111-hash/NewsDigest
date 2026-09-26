@@ -107,7 +107,9 @@ class DigestGenerator:
         self._clusterer = TopicClusterer()
         if similarity_threshold is None:
             similarity_threshold = self.config.digest.similarity_threshold
-        self._deduplicator = Deduplicator({"similarity_threshold": similarity_threshold})
+        self._deduplicator = Deduplicator(
+            {"similarity_threshold": similarity_threshold}
+        )
 
         # Initialize formatters
         self._formatters = {
@@ -129,12 +131,14 @@ class DigestGenerator:
             name: Display name for source.
             category: Category for clustering.
         """
-        self._sources.append({
-            "type": "rss",
-            "url": url,
-            "name": name or url,
-            "category": category,
-        })
+        self._sources.append(
+            {
+                "type": "rss",
+                "url": url,
+                "name": name or url,
+                "category": category,
+            }
+        )
 
     def add_newsapi(self, query: str, **kwargs: Any) -> None:
         """Add NewsAPI search to digest sources.
@@ -143,11 +147,13 @@ class DigestGenerator:
             query: Search query.
             **kwargs: Additional NewsAPI parameters.
         """
-        self._sources.append({
-            "type": "newsapi",
-            "query": query,
-            **kwargs,
-        })
+        self._sources.append(
+            {
+                "type": "newsapi",
+                "query": query,
+                **kwargs,
+            }
+        )
 
     def add_url(self, url: str, name: str | None = None) -> None:
         """Add single URL to digest sources.
@@ -156,11 +162,13 @@ class DigestGenerator:
             url: Article URL.
             name: Display name.
         """
-        self._sources.append({
-            "type": "url",
-            "url": url,
-            "name": name,
-        })
+        self._sources.append(
+            {
+                "type": "url",
+                "url": url,
+                "name": name,
+            }
+        )
 
     async def generate_async(
         self,
@@ -227,9 +235,7 @@ class DigestGenerator:
         """
         return asyncio.run(self.generate_async(period, format))
 
-    async def _fetch_all_sources(
-        self, since: datetime | None
-    ) -> list[dict[str, Any]]:
+    async def _fetch_all_sources(self, since: datetime | None) -> list[dict[str, Any]]:
         """Fetch articles from all configured sources.
 
         Args:
@@ -252,12 +258,14 @@ class DigestGenerator:
                     else:
                         articles = await self._rss_parser.parse(source["url"])
 
-                    for article in articles:
-                        all_articles.append({
+                    all_articles.extend(
+                        {
                             "article": article,
                             "source_name": source.get("name"),
                             "category": source.get("category"),
-                        })
+                        }
+                        for article in articles
+                    )
                 except Exception as e:
                     # Skip failed sources; one bad feed shouldn't sink the digest
                     logger.warning(f"Skipping source {source['url']}: {e}")
@@ -265,10 +273,12 @@ class DigestGenerator:
 
             elif source_type == "url":
                 # Single URL
-                all_articles.append({
-                    "url": source["url"],
-                    "source_name": source.get("name"),
-                })
+                all_articles.append(
+                    {
+                        "url": source["url"],
+                        "source_name": source.get("name"),
+                    }
+                )
 
         return all_articles
 

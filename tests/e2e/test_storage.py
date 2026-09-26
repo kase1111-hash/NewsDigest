@@ -314,7 +314,7 @@ class TestDatabase:
 
     def test_api_key_operations(self, db: Database):
         """Test API key storage."""
-        import hashlib  # noqa: PLC0415
+        import hashlib
 
         key_hash = hashlib.sha256(b"test-key").hexdigest()
 

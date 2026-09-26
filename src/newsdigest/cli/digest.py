@@ -87,8 +87,8 @@ def digest(
         if config_file:
             import yaml
 
-            with open(config_file, encoding="utf-8") as f:
-                sources_config = yaml.safe_load(f)
+            with Path(config_file).open(encoding="utf-8") as f:
+                sources_config = yaml.safe_load(f) or {}
 
             for source in sources_config.get("sources", []):
                 if source.get("type") == "rss":

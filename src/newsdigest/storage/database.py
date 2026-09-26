@@ -720,7 +720,7 @@ class Database:
             stats = {}
             for table in self.ALLOWED_TABLES:
                 # Table name validated against ALLOWED_TABLES whitelist
-                cursor.execute(f"SELECT COUNT(*) FROM {table}")  # noqa: S608
+                cursor.execute(f"SELECT COUNT(*) FROM {table}")
                 stats[table] = cursor.fetchone()[0]
 
         return stats

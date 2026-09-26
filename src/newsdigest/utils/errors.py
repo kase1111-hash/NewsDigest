@@ -7,11 +7,12 @@ This module provides centralized error reporting with support for:
 - Breadcrumb tracking for debugging
 """
 
+import importlib.util
 import os
 import sys
 import traceback
 from collections.abc import Callable
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from datetime import datetime
 from enum import Enum
 from functools import wraps
@@ -86,7 +87,7 @@ class ErrorContext:
 
         # Trim old breadcrumbs
         if len(self._breadcrumbs) > self._max_breadcrumbs:
-            self._breadcrumbs = self._breadcrumbs[-self._max_breadcrumbs:]
+            self._breadcrumbs = self._breadcrumbs[-self._max_breadcrumbs :]
 
     def set_tag(self, key: str, value: str) -> None:
         """Set a tag for filtering/grouping errors.
@@ -194,11 +195,7 @@ class ErrorReporter:
         self._error_handlers: list[Callable[[Exception, dict[str, Any]], None]] = []
 
         # Check for sentry-sdk
-        try:
-            import sentry_sdk
-            self._sentry_available = True
-        except ImportError:
-            self._sentry_available = False
+        self._sentry_available = importlib.util.find_spec("sentry_sdk") is not None
 
     def configure(
         self,
@@ -263,9 +260,7 @@ class ErrorReporter:
             )
 
             self._initialized = True
-            logger.info(
-                f"Sentry initialized for environment: {self._environment}"
-            )
+            logger.info(f"Sentry initialized for environment: {self._environment}")
             return True
 
         except Exception as e:
@@ -427,6 +422,7 @@ class ErrorReporter:
         if self._sentry_available and self._dsn:
             try:
                 import sentry_sdk
+
                 sentry_sdk.add_breadcrumb(
                     message=message,
                     category=category,
@@ -448,6 +444,7 @@ class ErrorReporter:
         if self._sentry_available and self._dsn:
             try:
                 import sentry_sdk
+
                 sentry_sdk.set_tag(key, value)
             except Exception:
                 pass
@@ -470,6 +467,7 @@ class ErrorReporter:
         if self._sentry_available and self._dsn:
             try:
                 import sentry_sdk
+
                 user_data = {}
                 if user_id:
                     user_data["id"] = user_id
@@ -606,6 +604,7 @@ def capture_errors(
         def my_function():
             pass
     """
+
     def decorator(func: F) -> F:
         @wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -614,10 +613,8 @@ def capture_errors(
             except Exception as e:
                 extra = {"function": func.__name__}
                 if extra_context:
-                    try:
+                    with suppress(Exception):
                         extra.update(extra_context(*args, **kwargs))
-                    except Exception:
-                        pass
 
                 capture_exception(e, severity=severity, extra=extra)
 
@@ -631,10 +628,8 @@ def capture_errors(
             except Exception as e:
                 extra = {"function": func.__name__}
                 if extra_context:
-                    try:
+                    with suppress(Exception):
                         extra.update(extra_context(*args, **kwargs))
-                    except Exception:
-                        pass
 
                 capture_exception(e, severity=severity, extra=extra)
 
@@ -642,6 +637,7 @@ def capture_errors(
                     raise
 
         import asyncio
+
         if asyncio.iscoroutinefunction(func):
             return async_wrapper  # type: ignore
         return wrapper  # type: ignore
@@ -713,7 +709,9 @@ def format_exception(
 
     # Check for NewsDigest exceptions with cause
     if hasattr(exception, "cause") and exception.cause:
-        parts.append(f"  Caused by: {type(exception.cause).__name__}: {exception.cause}")
+        parts.append(
+            f"  Caused by: {type(exception.cause).__name__}: {exception.cause}"
+        )
 
     # Check for details
     if hasattr(exception, "details") and exception.details:
@@ -722,7 +720,11 @@ def format_exception(
 
     # Add traceback if requested
     if include_traceback:
-        tb = "".join(traceback.format_exception(type(exception), exception, exception.__traceback__))
+        tb = "".join(
+            traceback.format_exception(
+                type(exception), exception, exception.__traceback__
+            )
+        )
         parts.append(f"\nTraceback:\n{tb}")
 
     return "\n".join(parts)

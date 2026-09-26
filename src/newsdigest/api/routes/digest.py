@@ -59,16 +59,15 @@ async def generate_digest(
     # Convert to API response
     sections = []
     for topic in digest_obj.topics:
-        articles = []
-        for item in topic.items:
-            articles.append(
-                DigestArticle(
-                    title=item.summary[:100] if item.summary else "Untitled",
-                    source=item.sources[0] if item.sources else "Unknown",
-                    summary=item.summary,
-                    url=item.urls[0] if item.urls else None,
-                )
+        articles = [
+            DigestArticle(
+                title=item.summary[:100] if item.summary else "Untitled",
+                source=item.sources[0] if item.sources else "Unknown",
+                summary=item.summary,
+                url=item.urls[0] if item.urls else None,
             )
+            for item in topic.items
+        ]
         sections.append(
             DigestSection(
                 topic=topic.name,

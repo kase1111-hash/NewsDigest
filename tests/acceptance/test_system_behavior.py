@@ -57,15 +57,23 @@ class TestExtractionQuality:
 
         # Output should have less emotional language
         emotional_words = [
-            "shocking", "unprecedented", "alarmed", "stunned",
-            "bombshell", "extraordinary", "shockwaves", "stunning"
+            "shocking",
+            "unprecedented",
+            "alarmed",
+            "stunned",
+            "bombshell",
+            "extraordinary",
+            "shockwaves",
+            "stunning",
         ]
         output_lower = result.text.lower()
         remaining = sum(1 for w in emotional_words if w in output_lower)
 
         # Should have removed at least some
         original_count = sum(1 for w in emotional_words if w in content.lower())
-        assert remaining < original_count or result.statistics.emotional_words_removed > 0
+        assert (
+            remaining < original_count or result.statistics.emotional_words_removed > 0
+        )
 
     def test_speculation_identified(self, extractor: Extractor) -> None:
         """Speculative content is identified and handled."""
@@ -100,7 +108,7 @@ class TestExtractionQuality:
         filler_phrases = [
             "here's what you need to know",
             "what happened next",
-            "stay tuned"
+            "stay tuned",
         ]
         output_lower = result.text.lower()
         remaining_filler = sum(1 for p in filler_phrases if p in output_lower)
@@ -181,7 +189,9 @@ class TestOutputFormats:
             "Apple reported $90 billion revenue. CEO Tim Cook was pleased with results."
         )
 
-    def test_json_is_valid(self, extractor: Extractor, result: ExtractionResult) -> None:
+    def test_json_is_valid(
+        self, extractor: Extractor, result: ExtractionResult
+    ) -> None:
         """JSON output is valid and parseable."""
         output = extractor.format(result, format="json")
 
@@ -377,8 +387,7 @@ class TestComparisonFeature:
         if result.sentences:
             # Each sentence should have a keep/remove decision
             for sentence in result.sentences:
-                has_decision = (
-                    hasattr(sentence, "keep") or
-                    hasattr(sentence, "removal_reason")
+                has_decision = hasattr(sentence, "keep") or hasattr(
+                    sentence, "removal_reason"
                 )
                 assert has_decision

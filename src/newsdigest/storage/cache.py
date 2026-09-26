@@ -11,6 +11,7 @@ from typing import Any, Generic, TypeVar
 
 from newsdigest.storage.base import BaseStorage, SyncStorage
 
+
 T = TypeVar("T")
 
 
@@ -113,7 +114,7 @@ class MemoryCache(BaseStorage[T]):
             if pattern is None:
                 return list(self._cache.keys())
 
-            return [k for k in self._cache.keys() if fnmatch.fnmatch(k, pattern)]
+            return [k for k in self._cache if fnmatch.fnmatch(k, pattern)]
 
     def _evict_oldest(self) -> None:
         """Evict the oldest cache entry."""
@@ -162,7 +163,7 @@ class FileCache(SyncStorage[dict[str, Any]]):
             return None
 
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            with file_path.open(encoding="utf-8") as f:
                 entry = json.load(f)
 
             # Check expiry
@@ -193,7 +194,7 @@ class FileCache(SyncStorage[dict[str, Any]]):
             "expires_at": expires_at,
         }
 
-        with open(file_path, "w", encoding="utf-8") as f:
+        with file_path.open("w", encoding="utf-8") as f:
             json.dump(entry, f)
 
     def delete(self, key: str) -> bool:

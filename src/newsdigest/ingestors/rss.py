@@ -108,7 +108,6 @@ class RSSParser(BaseIngestor):
 
         # Get feed metadata
         feed_title = feed.feed.get("title", "")
-        feed_link = feed.feed.get("link", "")
 
         # Parse source name from URL
         source_name = feed_title or urlparse(feed_url).netloc.replace("www.", "")

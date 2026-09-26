@@ -1,6 +1,5 @@
 """Repetition collapser for NewsDigest."""
 
-
 from newsdigest.analyzers.base import BaseAnalyzer
 from newsdigest.core.result import RemovalReason, Sentence
 
@@ -45,7 +44,9 @@ class RepetitionCollapser(BaseAnalyzer):
 
         # Get indices of sentences that are still active (keep=True)
         active_indices = [
-            i for i, s in enumerate(sentences) if s.keep and len(s.text.split()) >= self.min_sentence_length
+            i
+            for i, s in enumerate(sentences)
+            if s.keep and len(s.text.split()) >= self.min_sentence_length
         ]
 
         if len(active_indices) < 2:
@@ -62,7 +63,9 @@ class RepetitionCollapser(BaseAnalyzer):
                 # Mark all but first for removal
                 for idx in cluster_sorted[1:]:
                     sentences[idx].keep = False
-                    sentences[idx].removal_reason = RemovalReason.BACKGROUND_REPEAT.value
+                    sentences[
+                        idx
+                    ].removal_reason = RemovalReason.BACKGROUND_REPEAT.value
                     self.collapsed_count += 1
 
         return sentences
@@ -87,7 +90,7 @@ class RepetitionCollapser(BaseAnalyzer):
         # Build similarity graph
         similar_pairs: list[tuple[int, int]] = []
         for i, idx1 in enumerate(active_indices):
-            for idx2 in active_indices[i + 1:]:
+            for idx2 in active_indices[i + 1 :]:
                 similarity = self._jaccard_similarity(word_sets[idx1], word_sets[idx2])
                 if similarity >= self.similarity_threshold:
                     similar_pairs.append((idx1, idx2))
@@ -108,18 +111,109 @@ class RepetitionCollapser(BaseAnalyzer):
             Set of lowercase content words.
         """
         stop_words = {
-            "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-            "have", "has", "had", "do", "does", "did", "will", "would", "could",
-            "should", "may", "might", "must", "shall", "can", "to", "of", "in",
-            "for", "on", "with", "at", "by", "from", "as", "into", "through",
-            "during", "before", "after", "above", "below", "between", "under",
-            "again", "further", "then", "once", "and", "but", "or", "nor", "so",
-            "yet", "both", "either", "neither", "not", "only", "own", "same",
-            "than", "too", "very", "just", "also", "that", "this", "these",
-            "those", "it", "its", "they", "their", "them", "he", "she", "his",
-            "her", "him", "we", "our", "us", "you", "your", "who", "which",
-            "what", "when", "where", "why", "how", "all", "each", "every",
-            "any", "some", "no", "more", "most", "other", "such", "about",
+            "the",
+            "a",
+            "an",
+            "is",
+            "are",
+            "was",
+            "were",
+            "be",
+            "been",
+            "being",
+            "have",
+            "has",
+            "had",
+            "do",
+            "does",
+            "did",
+            "will",
+            "would",
+            "could",
+            "should",
+            "may",
+            "might",
+            "must",
+            "shall",
+            "can",
+            "to",
+            "of",
+            "in",
+            "for",
+            "on",
+            "with",
+            "at",
+            "by",
+            "from",
+            "as",
+            "into",
+            "through",
+            "during",
+            "before",
+            "after",
+            "above",
+            "below",
+            "between",
+            "under",
+            "again",
+            "further",
+            "then",
+            "once",
+            "and",
+            "but",
+            "or",
+            "nor",
+            "so",
+            "yet",
+            "both",
+            "either",
+            "neither",
+            "not",
+            "only",
+            "own",
+            "same",
+            "than",
+            "too",
+            "very",
+            "just",
+            "also",
+            "that",
+            "this",
+            "these",
+            "those",
+            "it",
+            "its",
+            "they",
+            "their",
+            "them",
+            "he",
+            "she",
+            "his",
+            "her",
+            "him",
+            "we",
+            "our",
+            "us",
+            "you",
+            "your",
+            "who",
+            "which",
+            "what",
+            "when",
+            "where",
+            "why",
+            "how",
+            "all",
+            "each",
+            "every",
+            "any",
+            "some",
+            "no",
+            "more",
+            "most",
+            "other",
+            "such",
+            "about",
         }
 
         words = text.lower().split()

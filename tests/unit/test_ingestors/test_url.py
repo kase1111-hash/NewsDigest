@@ -31,11 +31,14 @@ class TestURLFetcherClient:
 class TestURLFetcherSafety:
     """Tests for request validation."""
 
-    @pytest.mark.parametrize("url", [
-        "http://127.0.0.1/admin",
-        "http://169.254.169.254/latest/meta-data/",
-        "http://[::1]/",
-    ])
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "http://127.0.0.1/admin",
+            "http://169.254.169.254/latest/meta-data/",
+            "http://[::1]/",
+        ],
+    )
     async def test_redirect_targets_are_validated(self, url) -> None:
         """Test every request (including redirects) goes through URL checks."""
         with pytest.raises(ValidationError):

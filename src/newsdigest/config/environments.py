@@ -9,8 +9,6 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-import yaml
-
 from .settings import Config
 
 
@@ -58,8 +56,7 @@ class Environment(str, Enum):
             return aliases[normalized]
 
         raise ValueError(
-            f"Unknown environment: {value}. "
-            f"Valid values: {', '.join(aliases.keys())}"
+            f"Unknown environment: {value}. Valid values: {', '.join(aliases.keys())}"
         )
 
 
@@ -163,19 +160,16 @@ def load_env_file(path: Path | str | None = None) -> dict[str, str]:
     Returns:
         Dictionary of environment variables.
     """
-    if path is None:
-        path = get_env_file_path()
-    else:
-        path = Path(path)
+    path = get_env_file_path() if path is None else Path(path)
 
     if not path.exists():
         return {}
 
     env_vars: dict[str, str] = {}
 
-    with open(path) as f:
-        for line in f:
-            line = line.strip()
+    with path.open(encoding="utf-8") as f:
+        for raw_line in f:
+            line = raw_line.strip()
 
             # Skip empty lines and comments
             if not line or line.startswith("#"):

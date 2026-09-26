@@ -51,8 +51,12 @@ class JSONFormatter(BaseFormatter):
             "url": result.url,
             "title": result.title,
             "source": result.source,
-            "published": result.published_at.isoformat() if result.published_at else None,
-            "processed": result.processed_at.isoformat() if result.processed_at else None,
+            "published": result.published_at.isoformat()
+            if result.published_at
+            else None,
+            "processed": result.processed_at.isoformat()
+            if result.processed_at
+            else None,
             "extracted": {
                 "text": result.text,
                 "claims": [

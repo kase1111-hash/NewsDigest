@@ -1,13 +1,13 @@
 """Result data structures for NewsDigest extraction."""
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 
 
 def _utc_now() -> datetime:
     """Return current UTC time (timezone-aware)."""
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class SentenceCategory(Enum):
@@ -84,7 +84,7 @@ class Claim:
     source: str | None = None
     source_type: str = "unknown"
 
-    # Confidence (0.0 - 1.0)
+    # Confidence, from 0.0 to 1.0
     confidence: float = 0.0
 
     # Position

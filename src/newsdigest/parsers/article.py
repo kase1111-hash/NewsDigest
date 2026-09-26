@@ -134,7 +134,10 @@ class ArticleExtractor:
         if not title:
             return content
         first, sep, rest = content.partition("\n\n")
-        if sep and " ".join(first.split()).casefold() == " ".join(title.split()).casefold():
+        if (
+            sep
+            and " ".join(first.split()).casefold() == " ".join(title.split()).casefold()
+        ):
             return rest
         return content
 
@@ -148,11 +151,8 @@ class ArticleExtractor:
         Returns:
             Unique ID string.
         """
-        # Hash URL if available, otherwise hash content
-        if url:
-            hash_input = url
-        else:
-            hash_input = content[:1000]  # First 1000 chars
+        # Hash URL if available, otherwise the first 1000 chars of content
+        hash_input = url or content[:1000]
 
         return hashlib.sha256(hash_input.encode()).hexdigest()[:16]
 

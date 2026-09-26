@@ -18,10 +18,32 @@ STATISTICAL_PATTERNS: list[str] = [
 
 # Attribution verbs
 ATTRIBUTION_VERBS: list[str] = [
-    "said", "says", "stated", "announced", "declared", "claimed", "reported",
-    "confirmed", "denied", "acknowledged", "admitted", "argued", "asserted",
-    "contended", "maintained", "noted", "observed", "pointed out", "remarked",
-    "revealed", "suggested", "told", "wrote", "explained", "added", "warned",
+    "said",
+    "says",
+    "stated",
+    "announced",
+    "declared",
+    "claimed",
+    "reported",
+    "confirmed",
+    "denied",
+    "acknowledged",
+    "admitted",
+    "argued",
+    "asserted",
+    "contended",
+    "maintained",
+    "noted",
+    "observed",
+    "pointed out",
+    "remarked",
+    "revealed",
+    "suggested",
+    "told",
+    "wrote",
+    "explained",
+    "added",
+    "warned",
 ]
 
 
@@ -74,9 +96,7 @@ class ClaimExtractor(BaseAnalyzer):
 
         return sentences
 
-    def _extract_claims(
-        self, sentence: Sentence, index: int
-    ) -> list[Claim]:
+    def _extract_claims(self, sentence: Sentence, index: int) -> list[Claim]:
         """Extract claims from a sentence.
 
         Args:

@@ -44,7 +44,14 @@ select = [
 ignore = [
     "E501",   # Line too long (handled by formatter)
     "PLR0913", # Too many arguments
+    "PLR0917", # Too many positional arguments (same trade-off as PLR0913)
+    "PLR0911", # Too many return statements
+    "PLR0912", # Too many branches
+    "PLR0915", # Too many statements
     "PLR2004", # Magic value comparison
+    "PLC0415", # Import outside top level (lazy imports of optional deps)
+    "PLW0603", # Global statement (module-level singletons)
+    "UP042",   # StrEnum: changes str() of existing (str, Enum) classes
 ]
 
 # Allow autofix for all enabled rules

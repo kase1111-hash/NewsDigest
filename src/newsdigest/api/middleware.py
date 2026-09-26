@@ -66,7 +66,7 @@ class APIKeyManager:
         Returns:
             New API key object.
         """
-        import secrets  # noqa: PLC0415
+        import secrets
 
         # Generate a secure random key
         raw_key = secrets.token_urlsafe(32)
@@ -515,9 +515,7 @@ class RequestTracker:
         for latencies in self._latencies.values():
             all_latencies.extend(latencies)
 
-        avg_latency = (
-            sum(all_latencies) / len(all_latencies) if all_latencies else 0.0
-        )
+        avg_latency = sum(all_latencies) / len(all_latencies) if all_latencies else 0.0
 
         uptime = time.time() - self._start_time
 

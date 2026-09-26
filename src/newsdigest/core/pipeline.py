@@ -69,7 +69,7 @@ def _load_spacy_model(model_name: str) -> Any:
     Loading takes hundreds of milliseconds, and an Extractor is created per
     API request, so models are shared rather than loaded per pipeline.
     """
-    import spacy  # noqa: PLC0415
+    import spacy
 
     return spacy.load(model_name)
 
@@ -118,16 +118,16 @@ class AnalysisPipeline:
             try:
                 model_name = self.config.get("spacy_model", "en_core_web_sm")
                 self._nlp = _load_spacy_model(model_name)
-            except ImportError:
+            except ImportError as e:
                 raise ImportError(
                     "spaCy is required. Install with: pip install spacy && "
                     "python -m spacy download en_core_web_sm"
-                )
-            except OSError:
+                ) from e
+            except OSError as e:
                 raise OSError(
                     f"spaCy model not found. Download with: "
                     f"python -m spacy download {self.config.get('spacy_model', 'en_core_web_sm')}"
-                )
+                ) from e
         return self._nlp
 
     def _init_analyzers(self) -> None:

@@ -79,9 +79,7 @@ def sources(
         unnamed_count = result.statistics.unnamed_sources
 
         # Find sentences with unnamed sources
-        unnamed_sentences = [
-            s for s in result.sentences if s.has_unnamed_source
-        ]
+        unnamed_sentences = [s for s in result.sentences if s.has_unnamed_source]
 
         if output_format == "json":
             import json
@@ -90,8 +88,7 @@ def sources(
                 "named_sources": named_sources,
                 "unnamed_source_count": unnamed_count,
                 "unnamed_source_sentences": [
-                    {"index": s.index, "text": s.text}
-                    for s in unnamed_sentences
+                    {"index": s.index, "text": s.text} for s in unnamed_sentences
                 ],
                 "warnings": result.warnings,
             }
@@ -107,15 +104,15 @@ def sources(
         elif output_format == "text":
             lines = ["Named Sources:", "-" * 40]
             if named_sources:
-                for src in named_sources:
-                    lines.append(f"  - {src}")
+                lines.extend(f"  - {src}" for src in named_sources)
             else:
                 lines.append("  (none found)")
 
             lines.extend(["", "Unnamed Source References:", "-" * 40])
             if unnamed_sentences:
-                for s in unnamed_sentences:
-                    lines.append(f"  [{s.index + 1}] {s.text[:100]}...")
+                lines.extend(
+                    f"  [{s.index + 1}] {s.text[:100]}..." for s in unnamed_sentences
+                )
             else:
                 lines.append("  (none found)")
 

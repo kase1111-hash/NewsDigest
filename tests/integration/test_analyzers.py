@@ -71,7 +71,9 @@ class TestAnalyzerChain:
         assert sentence.keep is True
         assert sentence.text == original_text
         assert sentence.category == SentenceCategory.FACTUAL
-        assert sentence.speculation_score < analyzers["speculation"].speculation_threshold
+        assert (
+            sentence.speculation_score < analyzers["speculation"].speculation_threshold
+        )
         assert sentence.emotional_score < analyzers["emotional"].threshold
 
     def test_analyzers_detect_combined_issues(self, analyzers, to_sentences):
@@ -118,12 +120,15 @@ class TestAnalyzerChain:
 class TestAnalyzerConsistency:
     """Tests for analyzer consistency across inputs."""
 
-    @pytest.mark.parametrize("phrase", [
-        "Here's what you need to know",
-        "What happened next will surprise you",
-        "Stay tuned for more updates",
-        "But that's not all",
-    ])
+    @pytest.mark.parametrize(
+        "phrase",
+        [
+            "Here's what you need to know",
+            "What happened next will surprise you",
+            "Stay tuned for more updates",
+            "But that's not all",
+        ],
+    )
     def test_filler_detection_consistency(self, to_sentences, phrase):
         """Test that filler detection is consistent."""
         sentence = _single(to_sentences, phrase)
@@ -131,12 +136,15 @@ class TestAnalyzerConsistency:
         assert sentence.keep is False, f"Failed to detect filler: {phrase}"
         assert sentence.category == SentenceCategory.FILLER
 
-    @pytest.mark.parametrize("phrase", [
-        "This could potentially indicate a change",
-        "Experts suggest this might be significant",
-        "It would appear that markets may react",
-        "The decision could signal future shifts",
-    ])
+    @pytest.mark.parametrize(
+        "phrase",
+        [
+            "This could potentially indicate a change",
+            "Experts suggest this might be significant",
+            "It would appear that markets may react",
+            "The decision could signal future shifts",
+        ],
+    )
     def test_speculation_detection_consistency(self, to_sentences, phrase):
         """Test that speculation detection is consistent."""
         sentence = _single(to_sentences, phrase)
@@ -146,12 +154,15 @@ class TestAnalyzerConsistency:
         )
         assert sentence.keep is False
 
-    @pytest.mark.parametrize("phrase", [
-        "This is a shocking development",
-        "The unprecedented announcement alarmed experts",
-        "A stunning revelation emerged today",
-        "The bombshell news sent shockwaves",
-    ])
+    @pytest.mark.parametrize(
+        "phrase",
+        [
+            "This is a shocking development",
+            "The unprecedented announcement alarmed experts",
+            "A stunning revelation emerged today",
+            "The bombshell news sent shockwaves",
+        ],
+    )
     def test_emotional_detection_consistency(self, to_sentences, phrase):
         """Test that emotional detection is consistent."""
         sentence = _single(to_sentences, phrase)
@@ -162,13 +173,16 @@ class TestAnalyzerConsistency:
         )
         assert detector.get_emotional_word_count() > 0
 
-    @pytest.mark.parametrize("text", [
-        "The company reported $5 billion in revenue.",
-        "CEO John Smith confirmed the merger.",
-        "Stock prices increased by 2.5% today.",
-        "The Federal Reserve raised rates by 0.25%.",
-        "Unemployment fell to 3.5% in January.",
-    ])
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "The company reported $5 billion in revenue.",
+            "CEO John Smith confirmed the merger.",
+            "Stock prices increased by 2.5% today.",
+            "The Federal Reserve raised rates by 0.25%.",
+            "Unemployment fell to 3.5% in January.",
+        ],
+    )
     def test_false_positive_resistance(self, to_sentences, text):
         """Test that analyzers don't produce false positives on clean text."""
         sentence = _single(to_sentences, text)

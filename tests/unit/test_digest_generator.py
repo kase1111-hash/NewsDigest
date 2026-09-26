@@ -40,12 +40,15 @@ class TestDigestGeneratorOptions:
 class TestDigestPeriods:
     """Tests for period parsing."""
 
-    @pytest.mark.parametrize("period,delta", [
-        ("24h", timedelta(hours=24)),
-        ("7d", timedelta(days=7)),
-        ("1w", timedelta(weeks=1)),
-        (" 48H ", timedelta(hours=48)),
-    ])
+    @pytest.mark.parametrize(
+        "period,delta",
+        [
+            ("24h", timedelta(hours=24)),
+            ("7d", timedelta(days=7)),
+            ("1w", timedelta(weeks=1)),
+            (" 48H ", timedelta(hours=48)),
+        ],
+    )
     def test_valid_periods(self, period, delta):
         """Test periods resolve to a UTC cutoff."""
         since = DigestGenerator()._parse_period(period)

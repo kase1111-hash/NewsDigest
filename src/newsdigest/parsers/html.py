@@ -202,10 +202,7 @@ class HTMLCleaner:
 
             # Check class attribute
             classes = element.get("class", [])
-            if isinstance(classes, list):
-                class_str = " ".join(classes)
-            else:
-                class_str = str(classes)
+            class_str = " ".join(classes) if isinstance(classes, list) else str(classes)
 
             # Check id attribute
             elem_id = element.get("id", "") or ""

@@ -20,14 +20,17 @@ class TestTitleDetection:
         assert article.title == "Fed Holds Rates Steady"
         assert article.content == "The Fed held rates."
 
-    @pytest.mark.parametrize("text", [
-        # Hard-wrapped first sentence
-        "In a surprise move, the Federal\nReserve held rates.\n\nMore text.",
-        # First paragraph is a sentence, not a headline
-        "Google reported revenue of $75.3 billion.\n\nCloud grew 28%.",
-        # Single paragraph
-        "Apple reported revenue of $90 billion. Cook was pleased.",
-    ])
+    @pytest.mark.parametrize(
+        "text",
+        [
+            # Hard-wrapped first sentence
+            "In a surprise move, the Federal\nReserve held rates.\n\nMore text.",
+            # First paragraph is a sentence, not a headline
+            "Google reported revenue of $75.3 billion.\n\nCloud grew 28%.",
+            # Single paragraph
+            "Apple reported revenue of $90 billion. Cook was pleased.",
+        ],
+    )
     def test_body_text_is_never_taken_as_title(self, ingestor, text) -> None:
         """Test that no part of the body is lost to title detection."""
         article = ingestor.from_text(text)

@@ -249,10 +249,7 @@ class TestCompareEndpoint:
 
     def test_compare_returns_diff(self, client: TestClient):
         """Test compare returns diff."""
-        text = (
-            "In a shocking announcement, the company grew. "
-            "Revenue was $100 million."
-        )
+        text = "In a shocking announcement, the company grew. Revenue was $100 million."
 
         response = client.post(
             "/api/v1/compare",
@@ -389,7 +386,9 @@ class TestExtractionOptions:
         response = client.post(
             "/api/v1/extract/batch",
             json={
-                "sources": ["The dangerous storm hit Florida on Monday, officials said."],
+                "sources": [
+                    "The dangerous storm hit Florida on Monday, officials said."
+                ],
                 "mode": "aggressive",
             },
         )
@@ -418,7 +417,7 @@ class TestAppConfig:
 
     def test_passed_config_survives_startup(self):
         """Test the lifespan handler doesn't replace a config given to create_app."""
-        from newsdigest.config.settings import Config  # noqa: PLC0415
+        from newsdigest.config.settings import Config
 
         config = Config(cache_ttl=123)
         app = create_app(config=config, enable_rate_limit=False)
@@ -428,7 +427,7 @@ class TestAppConfig:
 
     def test_cache_disabled(self):
         """Test cache_enabled=False creates no cache."""
-        from newsdigest.config.settings import Config  # noqa: PLC0415
+        from newsdigest.config.settings import Config
 
         app = create_app(config=Config(cache_enabled=False), enable_rate_limit=False)
         with TestClient(app):

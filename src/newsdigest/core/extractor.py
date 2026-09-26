@@ -157,7 +157,10 @@ class Extractor:
             capture_exception(
                 e,
                 severity=ErrorSeverity.ERROR,
-                extra={"source": source[:100] if source else None, "source_type": source_type},
+                extra={
+                    "source": source[:100] if source else None,
+                    "source_type": source_type,
+                },
                 tags={"operation": "ingest"},
             )
             if isinstance(e, IngestError):
@@ -166,7 +169,7 @@ class Extractor:
                 f"Failed to ingest source: {e}",
                 cause=e,
                 details={"source": source[:100] if source else None},
-            )
+            ) from e
 
         try:
             # Process through pipeline
@@ -195,7 +198,10 @@ class Extractor:
             capture_exception(
                 e,
                 severity=ErrorSeverity.ERROR,
-                extra={"article_id": article.id, "source": source[:100] if source else None},
+                extra={
+                    "article_id": article.id,
+                    "source": source[:100] if source else None,
+                },
                 tags={"operation": "extraction"},
             )
             if isinstance(e, ExtractionError):
@@ -204,7 +210,7 @@ class Extractor:
                 f"Failed to extract content: {e}",
                 cause=e,
                 details={"article_id": article.id},
-            )
+            ) from e
 
     def extract_sync(self, source: str) -> ExtractionResult:
         """Synchronous version of extract.
@@ -265,7 +271,9 @@ class Extractor:
                     except Exception as e:
                         capture_exception(
                             e,
-                            severity=ErrorSeverity.WARNING if not fail_fast else ErrorSeverity.ERROR,
+                            severity=ErrorSeverity.WARNING
+                            if not fail_fast
+                            else ErrorSeverity.ERROR,
                             extra={"source": src[:100] if src else None},
                             tags={"operation": "batch_extraction"},
                         )
@@ -274,12 +282,14 @@ class Extractor:
                                 f"Batch extraction failed: {e}",
                                 cause=e,
                                 details={"source": src[:100] if src else None},
-                            )
+                            ) from e
                         return None
 
             tasks = [extract_one(src) for src in sources]
             results = await asyncio.gather(*tasks, return_exceptions=not fail_fast)
-            return [r for r in results if r is not None and not isinstance(r, Exception)]
+            return [
+                r for r in results if r is not None and not isinstance(r, Exception)
+            ]
         else:
             results = []
             for src in sources:
@@ -289,7 +299,9 @@ class Extractor:
                 except Exception as e:
                     capture_exception(
                         e,
-                        severity=ErrorSeverity.WARNING if not fail_fast else ErrorSeverity.ERROR,
+                        severity=ErrorSeverity.WARNING
+                        if not fail_fast
+                        else ErrorSeverity.ERROR,
                         extra={"source": src[:100] if src else None},
                         tags={"operation": "batch_extraction"},
                     )
@@ -298,7 +310,7 @@ class Extractor:
                             f"Batch extraction failed: {e}",
                             cause=e,
                             details={"source": src[:100] if src else None},
-                        )
+                        ) from e
                     continue
             return results
 
@@ -482,19 +494,17 @@ class Extractor:
         Returns:
             List of warning dictionaries.
         """
-        warnings = []
-        for sentence in sentences:
-            if sentence.has_unnamed_source and sentence.keep:
-                warnings.append(
-                    {
-                        "type": "UNNAMED_SOURCE",
-                        "text": sentence.text[:100] + "..."
-                        if len(sentence.text) > 100
-                        else sentence.text,
-                        "location": f"sentence {sentence.index + 1}",
-                    }
-                )
-        return warnings
+        return [
+            {
+                "type": "UNNAMED_SOURCE",
+                "text": sentence.text[:100] + "..."
+                if len(sentence.text) > 100
+                else sentence.text,
+                "location": f"sentence {sentence.index + 1}",
+            }
+            for sentence in sentences
+            if sentence.has_unnamed_source and sentence.keep
+        ]
 
     def _get_named_sources(self, sentences: list[Sentence]) -> list[str]:
         """Get list of named sources from sentences.
@@ -597,7 +607,7 @@ class Extractor:
         if claim_count == 0:
             # FIXME: Entity-based density estimation is a rough heuristic;
             # consider using sentence-transformers for semantic density scoring
-            entity_pattern = r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b'
+            entity_pattern = r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b"
             entities = re.findall(entity_pattern, text)
             claim_count = len(set(entities)) // 3  # Rough estimate
 

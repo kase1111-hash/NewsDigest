@@ -50,35 +50,31 @@ from newsdigest.integrations.twitter import (
     TwitterIngestor,
 )
 
+
 __all__ = [
-    # Email
     "DigestEmailScheduler",
     "EmailConfig",
     "EmailMessage",
     "EmailSender",
-    # NewsAPI
     "NewsAPIArticle",
     "NewsAPIClient",
     "NewsAPIConfig",
     "NewsAPIIngestor",
-    # Slack
     "SlackBot",
     "SlackChannel",
     "SlackConfig",
     "SlackMessage",
     "SlackSlashCommandHandler",
     "SlackUser",
-    "create_newsdigest_slack_bot",
-    # Telegram
     "TelegramBot",
     "TelegramChat",
     "TelegramConfig",
     "TelegramMessage",
     "TelegramUser",
-    "create_newsdigest_bot",
-    # Twitter
     "Tweet",
     "TwitterClient",
     "TwitterConfig",
     "TwitterIngestor",
+    "create_newsdigest_bot",
+    "create_newsdigest_slack_bot",
 ]

@@ -58,7 +58,11 @@ class URLFetcher(BaseIngestor):
         recreated whenever the running loop changes.
         """
         loop = asyncio.get_running_loop()
-        if self._client is None or self._client.is_closed or self._client_loop is not loop:
+        if (
+            self._client is None
+            or self._client.is_closed
+            or self._client_loop is not loop
+        ):
             self._client = httpx.AsyncClient(
                 timeout=self.timeout,
                 follow_redirects=True,
@@ -193,7 +197,9 @@ class URLFetcher(BaseIngestor):
                     raise
                 if not is_last:
                     # Rate limited waits longer than a server error
-                    await asyncio.sleep(2 ** (attempt + 2) if status == 429 else 2**attempt)
+                    await asyncio.sleep(
+                        2 ** (attempt + 2) if status == 429 else 2**attempt
+                    )
 
             except (httpx.TimeoutException, httpx.ConnectError) as e:
                 last_error = e

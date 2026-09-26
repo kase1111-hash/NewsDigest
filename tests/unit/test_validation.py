@@ -40,22 +40,22 @@ class TestURLValidation:
 
     def test_invalid_url_empty(self):
         """Test validation of empty URL."""
-        is_valid, error = validate_url("")
+        is_valid, _error = validate_url("")
         assert is_valid is False
 
     def test_invalid_url_ftp(self):
         """Test validation of FTP URL (not allowed)."""
-        is_valid, error = validate_url("ftp://example.com")
+        is_valid, _error = validate_url("ftp://example.com")
         assert is_valid is False
 
     def test_url_with_port(self):
         """Test validation of URL with port."""
-        is_valid, error = validate_url("https://example.com:8080/path")
+        is_valid, _error = validate_url("https://example.com:8080/path")
         assert is_valid is True
 
     def test_url_with_query_params(self):
         """Test validation of URL with query parameters."""
-        is_valid, error = validate_url("https://example.com?foo=bar&baz=1")
+        is_valid, _error = validate_url("https://example.com?foo=bar&baz=1")
         assert is_valid is True
 
     def test_private_network_blocked_by_default(self):
@@ -66,12 +66,12 @@ class TestURLValidation:
 
     def test_localhost_blocked_by_default(self):
         """Test that localhost is blocked by default."""
-        is_valid, error = validate_url("http://localhost/admin")
+        is_valid, _error = validate_url("http://localhost/admin")
         assert is_valid is False
 
     def test_private_network_allowed_when_enabled(self):
         """Test that private network URLs are allowed when enabled."""
-        is_valid, error = validate_url("http://192.168.1.1/admin", allow_private=True)
+        is_valid, _error = validate_url("http://192.168.1.1/admin", allow_private=True)
         assert is_valid is True
 
 
@@ -174,23 +174,23 @@ class TestTextContentValidation:
     def test_valid_text(self):
         """Test validation of valid text."""
         text = "This is a valid news article with sufficient content."
-        is_valid, error = validate_text_content(text)
+        is_valid, _error = validate_text_content(text)
         assert is_valid is True
 
     def test_empty_text(self):
         """Test validation of empty text."""
-        is_valid, error = validate_text_content("")
+        is_valid, _error = validate_text_content("")
         assert is_valid is False
 
     def test_too_short_text(self):
         """Test validation of text that's too short."""
-        is_valid, error = validate_text_content("Hi", min_length=10)
+        is_valid, _error = validate_text_content("Hi", min_length=10)
         assert is_valid is False
 
     def test_too_long_text(self):
         """Test validation of text that's too long."""
         text = "A" * 1000
-        is_valid, error = validate_text_content(text, max_length=100)
+        is_valid, _error = validate_text_content(text, max_length=100)
         assert is_valid is False
 
 

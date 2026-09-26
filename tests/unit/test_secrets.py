@@ -1,6 +1,5 @@
 """Tests for secrets management."""
 
-
 import pytest
 
 from newsdigest.config.secrets import (
@@ -193,7 +192,7 @@ class TestSecretsManager:
         manager = SecretsManager(cache_ttl=300)
 
         # First call
-        result1 = manager.get_secret("CACHED_SECRET")
+        manager.get_secret("CACHED_SECRET")
 
         # Change env var
         monkeypatch.setenv("CACHED_SECRET", "new-value")

@@ -118,6 +118,7 @@ class TestExtractorFormatting:
         assert isinstance(result, str)
         # Should be valid JSON
         import json
+
         parsed = json.loads(result)
         assert parsed["extracted"]["text"] == sample_extraction_result.text
 

@@ -6,8 +6,6 @@ import time
 
 from fastapi import APIRouter, Request
 
-logger = logging.getLogger(__name__)
-
 from newsdigest.api.models import (
     BatchExtractionRequest,
     BatchExtractionResponse,
@@ -24,6 +22,8 @@ from newsdigest.api.models import (
 from newsdigest.api.utils import get_config
 from newsdigest.core.extractor import Extractor
 
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -42,40 +42,37 @@ def _result_to_api(
         API extraction result model.
     """
     # Convert sentences
-    sentences = []
-    for s in result.sentences:
-        sentences.append(
-            Sentence(
-                text=s.text,
-                kept=s.keep,
-                density_score=s.density_score,
-                has_hedge=s.speculation_score > 0.3,
-                has_speculation=s.speculation_score > 0.5,
-                has_emotion=s.emotional_score > 0.5,
-            )
+    sentences = [
+        Sentence(
+            text=s.text,
+            kept=s.keep,
+            density_score=s.density_score,
+            has_hedge=s.speculation_score > 0.3,
+            has_speculation=s.speculation_score > 0.5,
+            has_emotion=s.emotional_score > 0.5,
         )
+        for s in result.sentences
+    ]
 
     # Convert claims
-    claims = []
-    for c in result.claims:
-        claims.append(
-            Claim(
-                text=c.text,
-                type=c.claim_type.value,
-                confidence=c.confidence,
-                source_attribution=c.source,
-            )
+    claims = [
+        Claim(
+            text=c.text,
+            type=c.claim_type.value,
+            confidence=c.confidence,
+            source_attribution=c.source,
         )
+        for c in result.claims
+    ]
 
     # Convert removed content
-    removed = []
-    for r in result.removed:
-        removed.append(
-            RemovedContent(
-                text=r.text,
-                reason=r.reason.value.lower(),
-            )
+    removed = [
+        RemovedContent(
+            text=r.text,
+            reason=r.reason.value.lower(),
         )
+        for r in result.removed
+    ]
 
     # Build removal breakdown
     breakdown: dict[str, int] = {}

@@ -9,15 +9,15 @@ from newsdigest.core.result import RemovalReason, Sentence
 # Patterns for named source attribution
 NAMED_SOURCE_PATTERNS: list[str] = [
     # Direct attribution: "said John Smith"
-    r'(?:said|says|told|tells|stated|announced|confirmed|denied|claimed|reported)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)',
+    r"(?:said|says|told|tells|stated|announced|confirmed|denied|claimed|reported)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)",
     # Title attribution: "CEO John Smith said"
-    r'(?:CEO|CFO|CTO|COO|President|Chairman|Director|Secretary|Minister|Senator|Representative|Governor|Mayor|Chief|Professor|Dr\.|Mr\.|Mrs\.|Ms\.)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+(?:said|says|told|stated)',
+    r"(?:CEO|CFO|CTO|COO|President|Chairman|Director|Secretary|Minister|Senator|Representative|Governor|Mayor|Chief|Professor|Dr\.|Mr\.|Mrs\.|Ms\.)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+(?:said|says|told|stated)",
     # According to Name
-    r'according to\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)',
+    r"according to\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)",
     # Name, title, said
-    r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+),\s+(?:a|an|the)?\s*(?:\w+\s+)*(?:at|of|for|with)\s+[\w\s]+,?\s+(?:said|says|told|stated)',
+    r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+),\s+(?:a|an|the)?\s*(?:\w+\s+)*(?:at|of|for|with)\s+[\w\s]+,?\s+(?:said|says|told|stated)",
     # Organization announced/said
-    r'(?:the\s+)?([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)*)\s+(?:announced|said|stated|reported|confirmed|denied)',
+    r"(?:the\s+)?([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)*)\s+(?:announced|said|stated|reported|confirmed|denied)",
 ]
 
 # Patterns for unnamed sources (flag these)
