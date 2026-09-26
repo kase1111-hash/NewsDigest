@@ -96,10 +96,13 @@ dev = [
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.1.0",
+    "fastapi>=0.104.0",  # API tests use FastAPI's test client
+    "uvicorn>=0.24.0",
     "ruff>=0.1.0",
     "mypy>=1.7.0",
     "pre-commit>=3.6.0",
     "types-PyYAML>=6.0.0",
+    "types-python-dateutil>=2.8.0",
     "bump2version>=1.0.1",
 ]
 
@@ -166,6 +169,11 @@ module = [
     "spacy.*",
     "bs4.*",
     "lxml.*",
+    # Optional integrations, imported only when installed
+    "boto3.*",
+    "newsapi.*",
+    "sentry_sdk.*",
+    "tweepy.*",
 ]
 ignore_missing_imports = true
 

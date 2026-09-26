@@ -14,7 +14,7 @@ from newsdigest.api.models import (
     SourceType,
 )
 from newsdigest.api.utils import get_config
-from newsdigest.digest.generator import DigestGenerator
+from newsdigest.digest.generator import Digest, DigestGenerator
 
 
 router = APIRouter()
@@ -55,6 +55,8 @@ async def generate_digest(
         period="24h",
         format="dict",
     )
+    if not isinstance(digest_obj, Digest):
+        raise TypeError(f"Expected Digest from generator, got {type(digest_obj)}")
 
     # Convert to API response
     sections = []

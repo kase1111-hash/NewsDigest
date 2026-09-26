@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 
 from newsdigest.api.models import ErrorResponse
 from newsdigest.api.routes import compare, digest, extract, health
+from newsdigest.api.utils import get_config
 from newsdigest.config.settings import Config
 from newsdigest.exceptions import (
     DigestError,
@@ -21,6 +22,9 @@ from newsdigest.exceptions import (
 from newsdigest.storage.cache import MemoryCache
 from newsdigest.version import __version__
 
+
+# get_config is re-exported for backwards compatibility (it lives in api/utils.py)
+__all__ = ["app", "create_app", "get_config", "lifespan"]
 
 logger = logging.getLogger(__name__)
 
@@ -202,7 +206,3 @@ def _register_exception_handlers(app: FastAPI) -> None:
 
 # Create default app instance
 app = create_app()
-
-
-# Re-export get_config for backwards compatibility
-from newsdigest.api.utils import get_config  # noqa: E402, F401

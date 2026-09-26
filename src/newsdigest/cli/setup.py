@@ -1,6 +1,6 @@
 """Setup command for NewsDigest CLI."""
 
-import subprocess
+import subprocess  # nosec B404 - only runs the spaCy downloader, no shell
 import sys
 from pathlib import Path
 
@@ -67,7 +67,7 @@ def setup_cmd(
     if not skip_spacy:
         console.print(f"[1/{steps_total}] Downloading spaCy model: {spacy_model}")
         try:
-            result = subprocess.run(
+            result = subprocess.run(  # nosec B603 - fixed argv, no shell
                 [sys.executable, "-m", "spacy", "download", spacy_model],
                 capture_output=True,
                 text=True,

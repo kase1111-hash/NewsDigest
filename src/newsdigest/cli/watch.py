@@ -11,7 +11,7 @@ from rich.markup import escape
 from rich.panel import Panel
 
 from newsdigest.config.settings import Config
-from newsdigest.digest.generator import DigestGenerator
+from newsdigest.digest.generator import Digest, DigestGenerator, DigestItem
 
 
 console = Console()
@@ -83,11 +83,15 @@ def watch(
         seen_ids: set[str] = set()
         last_check = datetime.utcnow()
 
-        async def check_feeds() -> list:
+        async def check_feeds() -> list[DigestItem]:
             """Check feeds for new articles."""
             nonlocal last_check
             try:
                 result = await generator.generate_async(period="1h", format="dict")
+                if not isinstance(result, Digest):
+                    raise TypeError(
+                        f"Expected Digest from generator, got {type(result)}"
+                    )
                 new_articles = []
 
                 for topic in result.topics:
@@ -102,7 +106,7 @@ def watch(
                 console.print(f"[yellow]Check failed: {e}[/yellow]")
                 return []
 
-        def display_article(item) -> None:
+        def display_article(item: DigestItem) -> None:
             """Display a new article."""
             if output_format == "json":
                 import json

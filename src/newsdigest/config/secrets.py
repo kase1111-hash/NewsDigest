@@ -11,7 +11,7 @@ import os
 import re
 from collections.abc import Callable
 from pathlib import Path
-from typing import TypeVar
+from typing import Any, TypeVar
 
 from newsdigest.utils.logging import get_logger
 
@@ -351,7 +351,7 @@ class SecretsManager:
         Args:
             cache_ttl: Cache time-to-live in seconds.
         """
-        self._cache: dict[str, tuple] = {}  # key -> (value, timestamp)
+        self._cache: dict[str, tuple[str, float]] = {}  # key -> (value, timestamp)
         self._cache_ttl = cache_ttl
 
     def get_secret(self, key: str, required: bool = False) -> SecretValue:
@@ -368,9 +368,9 @@ class SecretsManager:
 
         # Check cache
         if key in self._cache:
-            value, timestamp = self._cache[key]
+            cached_value, timestamp = self._cache[key]
             if time.time() - timestamp < self._cache_ttl:
-                return SecretValue(value)
+                return SecretValue(cached_value)
 
         # Fetch from backend
         try:
@@ -428,9 +428,10 @@ class AWSSecretsManager(SecretsManager):
         """
         super().__init__(cache_ttl)
         self._region = region_name or os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
-        self._client = None
+        # boto3 ships without type hints, so the client is untyped
+        self._client: Any = None
 
-    def _get_client(self):
+    def _get_client(self) -> Any:
         """Get or create boto3 client."""
         if self._client is None:
             try:
@@ -458,7 +459,8 @@ class AWSSecretsManager(SecretsManager):
             response = client.get_secret_value(SecretId=key)
 
             if "SecretString" in response:
-                return response["SecretString"]
+                secret_string: str = response["SecretString"]
+                return secret_string
             else:
                 import base64
 
@@ -481,7 +483,7 @@ class SecretMasker:
     def __init__(self) -> None:
         """Initialize secret masker."""
         self._secrets: list[str] = []
-        self._patterns: list[re.Pattern] = []
+        self._patterns: list[re.Pattern[str]] = []
 
         # Common secret patterns
         self._add_pattern(
@@ -529,7 +531,7 @@ class SecretMasker:
         # Mask pattern-matched secrets
         for pattern in self._patterns:
 
-            def replacer(match):
+            def replacer(match: re.Match[str]) -> str:
                 groups = match.groups()
                 if len(groups) >= 2:
                     # Keep prefix, mask the secret part

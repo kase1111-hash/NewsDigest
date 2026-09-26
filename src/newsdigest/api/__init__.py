@@ -1,6 +1,7 @@
 """REST API for NewsDigest."""
 
-from newsdigest.api.app import app, create_app, get_config
+from newsdigest.api.app import app, create_app
+from newsdigest.api.utils import get_config
 
 
 __all__ = [

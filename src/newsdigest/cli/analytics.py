@@ -2,6 +2,7 @@
 
 import sys
 from pathlib import Path
+from typing import TypedDict
 
 import click
 from rich.console import Console
@@ -12,10 +13,18 @@ from rich.table import Table
 from newsdigest.cli.utils import read_source
 from newsdigest.config.settings import Config
 from newsdigest.core.extractor import Extractor
+from newsdigest.core.result import ExtractionResult
 from newsdigest.exceptions import ExtractionError, IngestError
 
 
 console = Console()
+
+
+class _AnalyzedSource(TypedDict):
+    """A successfully analyzed source and its extraction result."""
+
+    source: str
+    result: ExtractionResult
 
 
 @click.command()
@@ -71,8 +80,8 @@ def analytics(
         config = Config.load()
         extractor = Extractor(config=config)
 
-        results = []
-        failed = []
+        results: list[_AnalyzedSource] = []
+        failed: list[dict[str, str]] = []
 
         for source in sources:
             try:

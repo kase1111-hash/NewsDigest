@@ -21,6 +21,7 @@ from newsdigest.api.models import (
 )
 from newsdigest.api.utils import get_config
 from newsdigest.core.extractor import Extractor
+from newsdigest.core.result import ExtractionResult as CoreExtractionResult
 
 
 logger = logging.getLogger(__name__)
@@ -29,7 +30,7 @@ router = APIRouter()
 
 
 def _result_to_api(
-    result: "ExtractionResult",  # type: ignore[name-defined]
+    result: CoreExtractionResult,
     processing_time_ms: float,
 ) -> ExtractionResult:
     """Convert internal ExtractionResult to API model.

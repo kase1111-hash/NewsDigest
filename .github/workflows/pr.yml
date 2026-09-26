@@ -19,7 +19,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install ruff
+          # Pinned: new ruff releases add rules, keep in sync with pre-commit
+          pip install ruff==0.16.9
 
       - name: Run Ruff linter
         run: ruff check src/ tests/
@@ -41,8 +42,10 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install mypy types-requests types-beautifulsoup4
+          # Include the API/email extras so FastAPI code is type-checked
+          # against real library types instead of failing on missing imports
+          pip install -e ".[api,email]"
+          pip install mypy types-PyYAML types-python-dateutil
 
       - name: Run mypy
         run: mypy src/
