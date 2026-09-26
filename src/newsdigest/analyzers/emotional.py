@@ -1,6 +1,7 @@
 """Emotional language detector for NewsDigest."""
 
 import re
+from typing import Any
 
 from newsdigest.analyzers.base import BaseAnalyzer
 from newsdigest.core.result import RemovalReason, Sentence, SentenceCategory
@@ -178,7 +179,7 @@ class EmotionalDetector(BaseAnalyzer):
     - If nothing meaningful remains after removal, the sentence is removed
     """
 
-    def __init__(self, config: dict | None = None) -> None:
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize emotional detector."""
         super().__init__(config)
         self.mode = self.config.get("mode", "remove")  # keep, flag, remove

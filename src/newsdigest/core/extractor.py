@@ -3,6 +3,7 @@
 import asyncio
 import concurrent.futures
 import re
+from typing import Any
 from urllib.parse import urlparse
 
 from newsdigest.config.settings import Config
@@ -90,7 +91,7 @@ class Extractor:
             "text": TextFormatter(self._config_dict.get("output", {})),
         }
 
-    def _build_config_dict(self) -> dict:
+    def _build_config_dict(self) -> dict[str, Any]:
         """Build configuration dictionary from Config object."""
         config_dict = {
             "extraction": {
@@ -286,9 +287,11 @@ class Extractor:
                         return None
 
             tasks = [extract_one(src) for src in sources]
-            results = await asyncio.gather(*tasks, return_exceptions=not fail_fast)
+            outcomes = await asyncio.gather(*tasks, return_exceptions=not fail_fast)
             return [
-                r for r in results if r is not None and not isinstance(r, Exception)
+                r
+                for r in outcomes
+                if r is not None and not isinstance(r, BaseException)
             ]
         else:
             results = []
@@ -485,7 +488,7 @@ class Extractor:
                 )
         return removed
 
-    def _build_warnings(self, sentences: list[Sentence]) -> list[dict]:
+    def _build_warnings(self, sentences: list[Sentence]) -> list[dict[str, str]]:
         """Build warnings list from sentences.
 
         Args:

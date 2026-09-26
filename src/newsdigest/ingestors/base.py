@@ -1,6 +1,7 @@
 """Base class for all ingestors."""
 
 from abc import ABC, abstractmethod
+from typing import Any
 
 from newsdigest.core.article import Article
 
@@ -12,7 +13,7 @@ class BaseIngestor(ABC):
     and converting it into Article objects.
     """
 
-    def __init__(self, config: dict | None = None) -> None:
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """
         Initialize ingestor with configuration.
 

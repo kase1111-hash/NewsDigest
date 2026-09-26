@@ -1,7 +1,7 @@
 """Topic clustering for NewsDigest."""
 
 import re
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from newsdigest.core.result import ExtractionResult
 
@@ -238,7 +238,7 @@ class TopicClusterer:
         ),
     ]
 
-    def __init__(self, config: dict | None = None) -> None:
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize topic clusterer.
 
         Args:

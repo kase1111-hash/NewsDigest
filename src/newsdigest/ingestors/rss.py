@@ -5,6 +5,7 @@ import calendar
 import hashlib
 import io
 from datetime import UTC, datetime
+from typing import Any
 from urllib.parse import urlparse
 
 import feedparser
@@ -12,6 +13,10 @@ import feedparser
 from newsdigest.core.article import Article, SourceType
 from newsdigest.ingestors.base import BaseIngestor
 from newsdigest.ingestors.url import URLFetcher
+from newsdigest.utils.logging import get_logger
+
+
+logger = get_logger(__name__)
 
 
 class RSSParser(BaseIngestor):
@@ -21,7 +26,7 @@ class RSSParser(BaseIngestor):
     Can optionally fetch full article content from links.
     """
 
-    def __init__(self, config: dict | None = None) -> None:
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize RSS parser.
 
         Args:
@@ -125,7 +130,7 @@ class RSSParser(BaseIngestor):
 
     async def _parse_entry(
         self,
-        entry: dict,
+        entry: feedparser.FeedParserDict,
         source_name: str,
         feed_url: str,
     ) -> Article | None:
@@ -161,9 +166,9 @@ class RSSParser(BaseIngestor):
                     content = full_article.content
                     if not title:
                         title = full_article.title
-            except Exception:
+            except Exception as e:
                 # Fall back to feed content
-                pass
+                logger.debug(f"Using feed content for {link}: full fetch failed: {e}")
 
         if not content:
             return None
@@ -199,7 +204,7 @@ class RSSParser(BaseIngestor):
         """
         return hashlib.sha256(identifier.encode()).hexdigest()[:16]
 
-    def _parse_date(self, entry: dict) -> datetime | None:
+    def _parse_date(self, entry: feedparser.FeedParserDict) -> datetime | None:
         """Parse published date from entry.
 
         Args:
@@ -246,7 +251,7 @@ class RSSParser(BaseIngestor):
             if article.published_at and article.published_at > since
         ]
 
-    async def get_feed_info(self, feed_url: str) -> dict:
+    async def get_feed_info(self, feed_url: str) -> dict[str, Any]:
         """Get feed metadata without fetching articles.
 
         Args:

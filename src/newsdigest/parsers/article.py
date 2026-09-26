@@ -2,6 +2,7 @@
 
 import hashlib
 from datetime import datetime
+from typing import Any
 from urllib.parse import urlparse
 
 from newsdigest.core.article import Article, SourceType
@@ -19,7 +20,7 @@ class ArticleExtractor:
     - Extract main body text
     """
 
-    def __init__(self, config: dict | None = None) -> None:
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize article extractor.
 
         Args:

@@ -1,6 +1,7 @@
 """Quote isolator for NewsDigest."""
 
 import re
+from typing import Any
 
 from newsdigest.analyzers.base import BaseAnalyzer
 from newsdigest.core.result import RemovalReason, Sentence, SentenceCategory
@@ -29,7 +30,7 @@ class QuoteIsolator(BaseAnalyzer):
     - Paraphrase patterns
     """
 
-    def __init__(self, config: dict | None = None) -> None:
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize quote isolator."""
         super().__init__(config)
         self._attribution_patterns = [
@@ -301,7 +302,7 @@ class QuoteIsolator(BaseAnalyzer):
             and len(w.strip(".,!?;:'\"()-[]")) > 2
         ]
 
-    def get_quote_stats(self) -> dict:
+    def get_quote_stats(self) -> dict[str, int]:
         """Get quote statistics.
 
         Returns:

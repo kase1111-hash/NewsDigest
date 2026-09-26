@@ -91,7 +91,7 @@ class DigestGenerator:
                 merged as duplicates. Defaults to the configured value.
         """
         self.config = config or Config()
-        self._sources: list[dict] = []
+        self._sources: list[dict[str, Any]] = []
 
         # Initialize components
         self._extractor = Extractor(self.config, mode=mode)
@@ -244,7 +244,7 @@ class DigestGenerator:
         Returns:
             List of article dictionaries with source info.
         """
-        all_articles = []
+        all_articles: list[dict[str, Any]] = []
 
         for source in self._sources:
             source_type = source.get("type")
@@ -405,7 +405,7 @@ class DigestGenerator:
         """Clear all configured sources."""
         self._sources = []
 
-    def get_sources(self) -> list[dict]:
+    def get_sources(self) -> list[dict[str, Any]]:
         """Get list of configured sources.
 
         Returns:

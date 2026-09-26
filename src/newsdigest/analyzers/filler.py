@@ -1,6 +1,7 @@
 """Filler content detector for NewsDigest."""
 
 import re
+from typing import Any
 
 from newsdigest.analyzers.base import BaseAnalyzer
 from newsdigest.core.result import RemovalReason, Sentence, SentenceCategory
@@ -67,7 +68,7 @@ class FillerDetector(BaseAnalyzer):
     - Very short sentences with no substantive content
     """
 
-    def __init__(self, config: dict | None = None) -> None:
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize filler detector."""
         super().__init__(config)
         self._engagement_patterns = [

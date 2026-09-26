@@ -1,6 +1,7 @@
 """Base class for all output formatters."""
 
 from abc import ABC, abstractmethod
+from typing import Any
 
 from newsdigest.core.result import ExtractionResult
 
@@ -18,7 +19,7 @@ class BaseFormatter(ABC):
         pass
 
     @abstractmethod
-    def format_digest(self, digest) -> str:
+    def format_digest(self, digest: Any) -> str:
         """Format a complete digest."""
         pass
 

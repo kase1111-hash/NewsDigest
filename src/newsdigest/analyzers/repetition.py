@@ -1,5 +1,7 @@
 """Repetition collapser for NewsDigest."""
 
+from typing import Any
+
 from newsdigest.analyzers.base import BaseAnalyzer
 from newsdigest.core.result import RemovalReason, Sentence
 
@@ -19,7 +21,7 @@ class RepetitionCollapser(BaseAnalyzer):
     - Similar claims with slight rewording
     """
 
-    def __init__(self, config: dict | None = None) -> None:
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize repetition collapser."""
         super().__init__(config)
         self.similarity_threshold = self.config.get("similarity_threshold", 0.7)

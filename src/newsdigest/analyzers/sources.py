@@ -1,6 +1,7 @@
 """Source validator for NewsDigest."""
 
 import re
+from typing import Any
 
 from newsdigest.analyzers.base import BaseAnalyzer
 from newsdigest.core.result import RemovalReason, Sentence
@@ -58,7 +59,7 @@ class SourceValidator(BaseAnalyzer):
     - 'remove': Remove sentences with only unnamed sources
     """
 
-    def __init__(self, config: dict | None = None) -> None:
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize source validator."""
         super().__init__(config)
         self._named_patterns = [
@@ -203,7 +204,7 @@ class SourceValidator(BaseAnalyzer):
         text_lower = text.lower()
         return any(pattern.search(text_lower) for pattern in self._unnamed_patterns)
 
-    def get_source_warnings(self, sentences: list[Sentence]) -> list[dict]:
+    def get_source_warnings(self, sentences: list[Sentence]) -> list[dict[str, str]]:
         """Generate warnings for unnamed sources.
 
         Args:

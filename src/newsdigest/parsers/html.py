@@ -1,9 +1,10 @@
 """HTML cleaner for NewsDigest."""
 
 import re
+from typing import Any
 
-from bs4 import BeautifulSoup, Comment, NavigableString, Tag
-from bs4.element import PreformattedString
+from bs4 import BeautifulSoup, Comment, Tag
+from bs4.element import NavigableString, PreformattedString
 
 
 # Elements to completely remove
@@ -139,7 +140,7 @@ class HTMLCleaner:
     - Non-content elements based on class/id patterns
     """
 
-    def __init__(self, config: dict | None = None) -> None:
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize HTML cleaner.
 
         Args:
@@ -201,7 +202,7 @@ class HTMLCleaner:
                 continue
 
             # Check class attribute
-            classes = element.get("class", [])
+            classes = element.get("class", "")
             class_str = " ".join(classes) if isinstance(classes, list) else str(classes)
 
             # Check id attribute
@@ -228,7 +229,7 @@ class HTMLCleaner:
         main = (
             soup.find("main")
             or soup.find("article")
-            or soup.find(attrs={"role": "main"})
+            or soup.find(None, attrs={"role": "main"})
             or soup.find(class_=re.compile(r"content|article|post|entry"))
         )
 
@@ -308,7 +309,7 @@ class HTMLCleaner:
 
         return text.strip()
 
-    def get_links(self, html: str) -> list[dict]:
+    def get_links(self, html: str) -> list[dict[str, Any]]:
         """Extract links from HTML.
 
         Args:
@@ -328,7 +329,7 @@ class HTMLCleaner:
 
         return links
 
-    def get_images(self, html: str) -> list[dict]:
+    def get_images(self, html: str) -> list[dict[str, Any]]:
         """Extract images from HTML.
 
         Args:

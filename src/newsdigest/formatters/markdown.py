@@ -16,7 +16,7 @@ class MarkdownFormatter(BaseFormatter):
     - Statistics
     """
 
-    def __init__(self, config: dict | None = None) -> None:
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize Markdown formatter.
 
         Args:

@@ -3,6 +3,7 @@
 import hashlib
 import re
 from pathlib import Path
+from typing import Any
 
 from newsdigest.core.article import Article, SourceType
 from newsdigest.ingestors.base import BaseIngestor
@@ -24,7 +25,7 @@ class TextIngestor(BaseIngestor):
     - File content
     """
 
-    def __init__(self, config: dict | None = None) -> None:
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize text ingestor.
 
         Args:

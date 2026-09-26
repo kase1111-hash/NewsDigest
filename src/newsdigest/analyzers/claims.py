@@ -1,6 +1,7 @@
 """Claim extractor for NewsDigest."""
 
 import re
+from typing import Any
 
 from newsdigest.analyzers.base import BaseAnalyzer
 from newsdigest.core.result import Claim, ClaimType, Sentence
@@ -62,7 +63,7 @@ class ClaimExtractor(BaseAnalyzer):
     - Declarative language
     """
 
-    def __init__(self, config: dict | None = None) -> None:
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize claim extractor."""
         super().__init__(config)
         self._stat_patterns = [

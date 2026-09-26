@@ -97,7 +97,7 @@ class AnalysisPipeline:
     4. Returns analyzed sentences with scores and flags
     """
 
-    def __init__(self, config: dict | None = None) -> None:
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize the analysis pipeline.
 
         Args:
@@ -314,7 +314,7 @@ class AnalysisPipeline:
             return self._claim_extractor.get_claims()
         return []
 
-    def get_statistics(self, sentences: list[Sentence]) -> dict:
+    def get_statistics(self, sentences: list[Sentence]) -> dict[str, Any]:
         """Get analysis statistics from sentences.
 
         Args:
@@ -327,7 +327,7 @@ class AnalysisPipeline:
         removed = [s for s in sentences if not s.keep]
 
         # Count by removal reason
-        removal_counts: dict = {}
+        removal_counts: dict[str, int] = {}
         for s in removed:
             reason = s.removal_reason or "unknown"
             removal_counts[reason] = removal_counts.get(reason, 0) + 1

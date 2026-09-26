@@ -1,6 +1,7 @@
 """Deduplication for NewsDigest."""
 
 import re
+from typing import Any
 
 from newsdigest.core.result import ExtractionResult
 
@@ -12,7 +13,7 @@ class Deduplicator:
     and merges metadata from duplicates.
     """
 
-    def __init__(self, config: dict | None = None) -> None:
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize deduplicator.
 
         Args:

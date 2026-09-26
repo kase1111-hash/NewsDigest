@@ -14,7 +14,7 @@ class JSONFormatter(BaseFormatter):
     Provides structured JSON output matching the API response format.
     """
 
-    def __init__(self, config: dict | None = None) -> None:
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize JSON formatter.
 
         Args:

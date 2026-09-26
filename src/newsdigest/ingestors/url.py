@@ -2,6 +2,7 @@
 
 import asyncio
 import time
+from typing import Any
 from urllib.parse import urlparse
 
 import httpx
@@ -33,7 +34,7 @@ class URLFetcher(BaseIngestor):
         "Mozilla/5.0 (compatible; NewsDigest/0.1; +https://github.com/newsdigest)"
     )
 
-    def __init__(self, config: dict | None = None) -> None:
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """Initialize URL fetcher.
 
         Args:
